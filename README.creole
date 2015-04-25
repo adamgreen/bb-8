@@ -1,0 +1,57 @@
+=BB-8 Droid Replica Project
+==Overview
+This project is just a place for me to record any progress I make as I attempt to build a replica of the BB-8 droid from
+the new Star Wars The Force Awakens movie.
+
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150424-01.jpg?token=ABAvOCyKz73IWriF8wzJmpPRW0-OM7-qks5VRCBiwA%3D%3D}}\\
+Above image from
+[[www.thingiverse.com/thing:570274 | Star Wars The Force Awakens - BB-8 Ball Droid by lilykill - Published on November 30, 2014]]
+
+
+
+==Interesting Links
+[[https://www.youtube.com/watch?v=ABzjUf3E_0c | Video of BB-8 on stage at Star Wars Celebration 2015]]\\
+[[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Make This Mini Star Wars BB-8 Ball Droid with a Hacked Sphero by Christian Poulsen]]\\
+[[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | BB-8 Construction Conversation on Hackaday]]\\
+
+
+
+==April 24, 2015
+Last weekend I saw new videos from the Star Wars Celebration 2015 event that took place last week.  The video
+that really caught my eye was [[https://www.youtube.com/watch?v=ABzjUf3E_0c | the one showing]] a new spherical droid
+rolling around on the stage.  This new droid goes by the name of BB-8.  I had seen cameos of this new droid in the Star
+Wars The Force Awakens movie trailers but I just figured it was all CGI, Computer Generated Imagery, so never really
+gave it much of a second thought.  I mean I was interested to see it in the theater when the movie releases but it never
+triggered any robot building ambitions.  It was magical to see an actual working BB-8 prop on the stage in that Star
+Wars Celebration video.  The head just seems to levitate over the rolling spherical body.  Could I build one of these
+magical looking bots myself?
+
+===How does it work?
+[[[[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | A great conversation started up on Hackaday]]
+discussing how this BB-8 prop actually works.  The key takeaways that I got from the Hackaday comments were:
+* [[http://www.gosphero.com | Orbotix / Sphero]] is the company behind the functional BB-8 prop.
+* Orbotix / Sphero already markets [[http://www.gosphero.com/sphero/ | a spherical robotic toy]] that works like the
+  BB-8 prop, it's just missing the head.
+* Orbotix / Sphero has patents which explain how the rolling spherical base and captured head function:
+** [[https://www.google.com/patents/US8571781?dq=orbotix&hl=en&sa=X&ei=Ghk7VYf7EIvGogT074H4Ag&sqi=2&pjf=1&ved=0CDsQ6AEwBA | Self-propelled device with actively engaged drive system]]
+** [[https://www.google.com/patents/US20140238762?dq=orbotix&hl=en&sa=X&ei=Ghk7VYf7EIvGogT074H4Ag&sqi=2&pjf=1&ved=0CFAQ6AEwBw | Multi-purposed self-propelled device]]
+** [[https://www.google.com/patents/US20140345957?dq=orbotix&hl=en&sa=X&ei=Ghk7VYf7EIvGogT074H4Ag&sqi=2&pjf=1&ved=0CDQQ6AEwAw | Magnetically coupled accessory for a self-propelled device ]]
+* Orbotix / Sphero is most likely going to release a functional BB-8 toy in time for the release of the Star Wars The
+  Force Awakens movie and the 2015 holiday season.
+
+There is also some discussion about the BB-8 droid on the
+[[https://groups.yahoo.com/neo/groups/r2buildersclub/info | R2 Builders Club Yahoo Group]].
+
+===Building the BB-8
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150424-02.jpg?token=ABAvOIooEXkVjTw8sMVqoVO7qVjXWdMcks5VRGOzwA%3D%3D}}
+
+How should I proceed with building a BB-8 replica?  I would like to build a life size replica, which I believe to be
+about 18 inches in diameter, but I want to start with a few smaller replicas first.
+* I would first like to replicate
+  [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Christian Poulsen's Sphero BB-8 hack]].
+** I ordered a Sphero 1.0 bot from Amazon earlier in the week and it arrived today.
+** I plan to start the hack this weekend by cutting the sphere in two but only after I get in some more play time.
+** I don't plan to paint it to look like the BB-8.  I just want to reproduce the captured foam head portion of the hack.
+* A half scale replica that would be fully functional.  This is where I would work out head movement / control.
+* A full scale replica.  This replica should be fully functional and painted to match the actual prop as closely as
+  possible.
