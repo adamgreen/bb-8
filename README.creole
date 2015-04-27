@@ -16,6 +16,25 @@ Above image from
 
 
 
+==April 26, 2015
+I decided that today was the day to start trying to hack my Sphero 1 in an attempt to reproduce
+[[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Christian Poulsen's Sphero BB-8 hack]].
+Before getting my hands on an actual Sphero, I didn't realize that there was as significant of a seam as there is
+between the two joined hemispheres.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-01.jpg?token=ABAvOMsnbkUaLd6xQLZ0YiIbOMRehiMqks5VRxBUwA%3D%3D}}\\
+The seam actually made it easier to get a hacksaw blade in between the two hemispheres and start cutting it apart.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-02.jpg?token=ABAvOKpK1Nb4n7tWTfCe1QHc3JzkFcx0ks5VRxJywA%3D%3D}}\\
+Here are a few more photos that I took after pulling my poor little Sphero apart:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-03.jpg?token=ABAvOBFadmt9JOu0YRRFkj-k9v7zD-ipks5VRximwA%3D%3D}}
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-04.jpg?token=ABAvOCTitX2wCOweBxN2dFtWUSiRv9AZks5VRxkHwA%3D%3D}}\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-05.jpg?token=ABAvOHyvYGogEiWh5Ld4ejH2OzHwJfogks5VRxmDwA%3D%3D}}
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-06.jpg?token=ABAvOJKjy_WOIyMTO4LNVP7TyBgiF_8gks5VRxmfwA%3D%3D}}\\
+
+Tomorrow I will start trying to track down the rest of the materials that I need to complete this Sphero hack.  That
+includes some strong magnets and foam to create a captured head.
+
+
+
 ==April 24, 2015
 Last weekend I saw new videos from the Star Wars Celebration 2015 event that took place last week.  The video
 that really caught my eye was [[https://www.youtube.com/watch?v=ABzjUf3E_0c | the one showing]] a new spherical droid
