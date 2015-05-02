@@ -3,7 +3,7 @@
 This project is just a place for me to record any progress I make as I attempt to build a replica of the BB-8 droid from
 the new Star Wars The Force Awakens movie.
 
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150424-01.jpg?token=ABAvOCyKz73IWriF8wzJmpPRW0-OM7-qks5VRCBiwA%3D%3D}}\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150424-01.jpg}}\\
 Above image from
 [[www.thingiverse.com/thing:570274 | Star Wars The Force Awakens - BB-8 Ball Droid by lilykill - Published on November 30, 2014]]
 
@@ -21,14 +21,14 @@ I decided that today was the day to start trying to hack my Sphero 1 in an attem
 [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Christian Poulsen's Sphero BB-8 hack]].
 Before getting my hands on an actual Sphero, I didn't realize that there was as significant of a seam as there is
 between the two joined hemispheres.\\
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-01.jpg?token=ABAvOMsnbkUaLd6xQLZ0YiIbOMRehiMqks5VRxBUwA%3D%3D}}\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-01.jpg}}\\
 The seam actually made it easier to get a hacksaw blade in between the two hemispheres and start cutting it apart.\\
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-02.jpg?token=ABAvOKpK1Nb4n7tWTfCe1QHc3JzkFcx0ks5VRxJywA%3D%3D}}\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-02.jpg}}\\
 Here are a few more photos that I took after pulling my poor little Sphero apart:\\
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-03.jpg?token=ABAvOBFadmt9JOu0YRRFkj-k9v7zD-ipks5VRximwA%3D%3D}}
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-04.jpg?token=ABAvOCTitX2wCOweBxN2dFtWUSiRv9AZks5VRxkHwA%3D%3D}}\\
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-05.jpg?token=ABAvOHyvYGogEiWh5Ld4ejH2OzHwJfogks5VRxmDwA%3D%3D}}
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-06.jpg?token=ABAvOJKjy_WOIyMTO4LNVP7TyBgiF_8gks5VRxmfwA%3D%3D}}\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-03.jpg}}
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-04.jpg}}\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-05.jpg}}
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150426-06.jpg}}\\
 
 Tomorrow I will start trying to track down the rest of the materials that I need to complete this Sphero hack.  That
 includes some strong magnets and foam to create a captured head.
@@ -62,7 +62,7 @@ There is also some discussion about the BB-8 droid on the
 [[https://groups.yahoo.com/neo/groups/r2buildersclub/info | R2 Builders Club Yahoo Group]].
 
 ===Building the BB-8
-{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150424-02.jpg?token=ABAvOIooEXkVjTw8sMVqoVO7qVjXWdMcks5VRGOzwA%3D%3D}}
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150424-02.jpg?}}
 
 How should I proceed with building a BB-8 replica?  I would like to build a life size replica, which I believe to be
 about 18 inches in diameter, but I want to start with a few smaller replicas first.
