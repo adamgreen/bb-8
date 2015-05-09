@@ -16,6 +16,80 @@ Above image from
 
 
 
+==May 8, 2015
+I spent some time this week modifying my Sphero 1 to reproduce
+[[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Christian Poulsen's Sphero BB-8 hack]]
+to magnetically couple an external piece of foam to the Sphero's internal biasing mechanism.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150507-06.jpg}}\\
+
+===If at first you don't succeed
+My first attempt to complete the project was a failure.  I used these
+[[http://www.amazon.com/gp/product/B00J53I7D0/ref=oh_aui_detailpage_o01_s00?ie=UTF8&psc=1 | 2mm x 1mm neodymium magnets]]
+and they just didn't have enough pull to properly capture my foam dome.  The following photo shows how I mounted these
+smaller magnets into 5/32" holes that I had drilled into the biasing unit:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150507-01.jpg}}\\
+I made a few other mistakes in this first attempt:
+* I didn't get the proper concave curve on the bottom of the dome so that it would fit nicely on the outside of the
+  Sphero.
+* I had the magnets off center in the foam dome as well.
+
+===Try again
+So the first change I made for the second attempt was to use stronger magnets.  I had waited a week for those small
+2mm x 1mm magnets to arrive and then I ended up using some larger/stronger magnets that I had purchased at a local craft
+store a few years ago for another project.  I first drilled out the small ones that I previously attempted to use and
+then used epoxy to attach three of the stronger magnets to the bottom of the biasing unit, as far from the center of the
+unit as the size of the magnets would allow:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150507-04.jpg}}\\
+For each of these magnets I had one on the other side of the biasing unit to help position the magnets and hold them in
+place while the epoxy cured.  These helper magnets also worked around the issue that once one magnet was mounted in the
+biasing unit, the others would be attracted to it as I attempted to mount them.
+
+I purchased a 2" diameter foam sphere from a local craft store and cut it in half to act as a stand-in for the BB-8
+head.  I know that this foam dome isn't to scale and isn't even the correct shape for a BB-8 head but at this point I
+just wanted to see the magnetic coupling work.  I needed the bottom surface of this dome to match the curvature of the
+outside of the Sphero toy so I taped a strip of 60 grit sand paper to the outside of the Sphero as shown here:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150507-02.jpg}}\\
+I then rotated the foam dome over this sand paper to get the correct curvature.  I did need to dig out some of the foam
+at the center of the dome with an Exacto knife.  This removed material where there was the most to be removed without
+excessive sanding which would tear at the outer edge of the dome.
+
+The next step was to place another 3 magnets on the base of the foam dome.  To make sure that the magnets were
+spaced/oriented correctly, I placed the Sphero biasing unit with its 3 magnets inside one half of the Sphero body and
+then sandwiched some wax paper between the outer Sphero body and the 3 magnets.  Now the magnets are sitting on the
+surface of the Sphero body in the required orientation:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150507-03.jpg}}\\
+I then covered the magnets and wax paper with epoxy so that I could press the foam dome down onto the magnets after I
+was careful to center them.  I just held the dome there for the 10 minutes it took for a basic cure but an elastic band
+would have been better.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150507-06.jpg}}
+
+Now I just had to put the Sphero back together.  I cleaned up the edges of the cut apart Sphero body using an Exacto
+knife and then used elastic bands to hold the Shero together while I dapped hot glue around the seam, making sure not to
+use so much that it would go inside.  I also kept the seam pointed down while the hot glue cooled so that gravity
+wouldn't pull it inside either.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150507-05.jpg}}
+
+
+===Issues Encountered
+The Sphero does show a problem after my modifications.  It doesn't drive as smoothly as it did before my hacks, even
+when the foam dome isn't attached).  It is kind of jerky.  I have a few ideas as to what may be causing the problem:
+* The inner surface of the Sphero isn't as smooth after I put it back together.  This could catch the wheels or biasing
+  unit of the Sphero.
+* The holes that I drilled in the biasing unit cause it to catch on the interior surface of the Sphero.
+* The strong magnets are throwing off the magnetometer in the electronics and the confusion it causes in yaw rate causes
+  problems for the motion control algorithm.
+* The center of mass has moved because of the magnets added to the biasing unit.  Maybe this causes some instability in
+  the PID algorithm as it was tuned for the original mass distribution.
+
+If any of these things were the cause then I will be able to diagnose and correct them in the larger models so I will
+leave further investigation until I see if it happens in those future models.
+
+===Next Steps
+At this point I want to start working on a half scale (~10" diameter) model of the BB-8 which also allows for RC
+directed motion of the dome.
+
+
+
 ==April 26, 2015
 I decided that today was the day to start trying to hack my Sphero 1 in an attempt to reproduce
 [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Christian Poulsen's Sphero BB-8 hack]].
