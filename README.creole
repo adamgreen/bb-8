@@ -16,6 +16,35 @@ Above image from
 
 
 
+==May 14, 2015
+===Sphero 2 Teardown
+I performed a teardown on a Sphero 2 this week and took some photos of the cool engineering to be found within its
+sphere:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-08.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-08-Full.jpg | Fullsize]]\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-09.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-09-Full.jpg | Fullsize]]\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-10.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-10-Full.jpg | Fullsize]]\\
+The above 3 photo were taken of the cart before I started to take it apart.  The last photo shows the coil on the bottom
+of the Sphero which is used for inductive charging.  In that same photo, you can also see one of the two drive motors
+just above the coil.  Just above the motors is where the LiPo batteries are located.  The top of the cart contains the
+PCB and an additional two wheels mounted to a spring.  These two wheels act as the biasing mechanism for the Sphero 2
+and guarantee that there is downward pressure on the drive wheels.
+
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-01.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-01-Full.jpg | Fullsize]]\\
+This next photo is a closeup of the spring loaded biasing mechanism.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-02.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-02-Full.jpg | Fullsize]]\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-03.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-03-Full.jpg | Fullsize]]\\
+The next photo is of the top of the PCB.  The first thing I noticed is that it contains two STM32 processors: a
+STM32F100RC (Cortex-M3) and a  STM32F373C8 (Cortex-M4F).\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-04.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-04-Full.jpg | Fullsize]]\\
+The next 2 photos show the bottom of the PCB and where that PCB connects to the rest of the robot.  The PCB contains
+male headers which mate with female headers that are held fast in the body plastics.  It is very well engineered.  I was
+surprised to see such a nice and neat interconnect inside of a toy.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-05.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-05-Full.jpg | Fullsize]]\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-06.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-06-Full.jpg | Fullsize]]\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-07.jpg}} [[https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150514-07-Full.jpg | Fullsize]]\\
+
+
+
 ==May 8, 2015
 I spent some time this week modifying my Sphero 1 to reproduce
 [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Christian Poulsen's Sphero BB-8 hack]]
