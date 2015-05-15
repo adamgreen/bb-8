@@ -12,6 +12,9 @@ Above image from
 ==Interesting Links
 [[https://www.youtube.com/watch?v=ABzjUf3E_0c | Video of BB-8 on stage at Star Wars Celebration 2015]]\\
 [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Make This Mini Star Wars BB-8 Ball Droid with a Hacked Sphero by Christian Poulsen]]\\
+[[https://github.com/adamgreen/bb-8#may-8-2015 | My Sphero 1 Hacking]]\\
+[[https://github.com/adamgreen/bb-8#april-26-2015 | My Sphero 1 Teardown]]\\
+[[https://github.com/adamgreen/bb-8#sphero-2-teardown | My Sphero 2 Teardown]]\\
 [[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | BB-8 Construction Conversation on Hackaday]]\\
 
 
