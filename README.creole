@@ -17,6 +17,32 @@ Above image from
 [[http://astromech.net | Astromech.net - The Official Website of the R2-D2 Builders Club]]\\
 [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Make This Mini Star Wars BB-8 Ball Droid with a Hacked Sphero by Christian Poulsen]]\\
 [[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | BB-8 Construction Conversation on Hackaday]]\\
+[[https://github.com/adamgreen/bb-8#clone-this-repo-and-its-submodules | How to Clone this GitHub Repository]]\\
+
+
+
+==May 17, 2015
+===Clone this Repo and its Submodules
+Cloning now requires a few more options to fetch all of the necessary code.
+
+{{{
+git clone --recursive git@github.com:adamgreen/bb-8.git
+}}}
+
+* In the gcc4mbed subdirectory you will find multiple install scripts.  Run the install script appropriate for your
+platform:
+** Windows: win_install.cmd
+** OS X: mac_install
+** Linux: linux_install
+* You can then run the BuildShell script which will be created during the install to properly configure the PATH
+environment variable.  You may want to edit this script to further customize your development environment.
+
+**Important Notes:**
+* OS X Mountain Lion and newer will fail to execute mac_install by simply clicking on it.  Instead right click on
+mac_install in the Finder, select the Open option, and then click the Open button in the resulting security warning
+dialog.
+* If the installation should fail, please refer to win_install.log, linux_install.log, or mac_install.log.  It will
+contain the details of the installation process and any errors that were encountered.
 
 
 
