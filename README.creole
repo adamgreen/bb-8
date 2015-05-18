@@ -9,6 +9,13 @@ Above image from
 
 
 
+==Legal Notes
+* This BB-8 replica git repository is created by a Star Wars fan for other such fans. It is not sponsored or endorsed by Lucasfilm Ltd.
+* Star Wars, its characters, costumes, and all associated items are the intellectual property of Lucasfilm. © & ™ Lucasfilm Ltd. All rights reserved.
+* Some of the control mechanisms in this BB-8 replica are covered by patents granted and/or pending to [[http://www.gosphero.com | Sphero]].
+
+
+
 ==Interesting Links
 [[https://www.youtube.com/watch?v=ABzjUf3E_0c | Video of BB-8 on stage at Star Wars Celebration 2015]]\\
 [[https://github.com/adamgreen/bb-8#may-8-2015 | My Sphero 1 Hacking]]\\
