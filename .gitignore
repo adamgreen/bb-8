@@ -1,2 +1,9 @@
 # Files to be ignored by Git
 .DS_Store
+*.bin
+*.disasm
+*.elf
+*.hex
+*.map
+*.o
+*.d
