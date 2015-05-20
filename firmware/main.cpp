@@ -12,34 +12,25 @@
 */
 /* This will become the firmware for controlling my Star Wars BB-8
    replica but at this time I am just bootstrapping the drivers that
-   I need for this final control system.
+   I need for the final control system.
 */
 #include <ctype.h>
 #include <mbed.h>
+#include "Motor.h"
 
 // Set to 1 to have serial data echoed back to terminal.
 #define SERIAL_ECHO 1
 
-typedef struct MotorState
-{
-    float    pulseWidth;
-    uint32_t input;
-} MotorState;
+// Default motor PWM period.
+#define PWM_PERIOD (1.0f / 20000.0f)
 
-static MotorState g_rightMotor;
-static MotorState g_leftMotor;
-static float      g_period = 1.0f / 20000.0f;
-static Serial     g_serial(USBTX, USBRX);
-static PwmOut     g_pwmRight(p21); // B
-static PwmOut     g_pwmLeft(p22);  // A
-static BusOut     g_motorOut(p27, p26, p29, p30); // B1, B2, A1, A2
-static DigitalOut g_standby(p28);
+static Serial       g_serial(USBTX, USBRX);
+static Motor        g_motor(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
 
-static void updateMotorOutputs(void);
+static void updateMotorOutputs(float rightValue, float leftValue, float period);
 static void serialRxHandler(void);
 static void parseCommand(char* pCommand);
-static uint32_t parseMotorInput(char** ppCommand);
-static float parseMotorWidth(char** ppCommand);
+static float parseMotorValue(char** ppCommand);
 static void skipWhitespace(char** ppCommand);
 static float parseOptionalPeriod(char* pCommand, float defaultVal);
 
@@ -47,7 +38,7 @@ int main()
 {
     g_serial.baud(230400);
 
-    updateMotorOutputs();
+    updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
     g_serial.attach(serialRxHandler);
 
     for (;;)
@@ -57,17 +48,14 @@ int main()
     return 0;
 }
 
-static void updateMotorOutputs(void)
+static void updateMotorOutputs(float rightValue, float leftValue, float period)
 {
-    g_standby = 1;
-    g_pwmRight.period(g_period);
-    g_pwmRight = g_rightMotor.pulseWidth;
-    g_pwmLeft = g_leftMotor.pulseWidth;
-    g_motorOut = (((g_leftMotor.input & 3) << 2) | (g_rightMotor.input & 3));
+    g_motor.setPeriod(period);
+    g_motor.set(leftValue, rightValue);
 
-    printf("frequency = %f\n", 1.0f / g_period);
-    printf("right=%lu,%f\n", g_rightMotor.input, g_rightMotor.pulseWidth * 100.0f);
-    printf("left=%lu,%f\n", g_leftMotor.input, g_leftMotor.pulseWidth * 100.0f);
+    printf("frequency = %f\n", 1.0f / period);
+    printf("    right = %f\n", rightValue * 100.0f);
+    printf("     left = %f\n", leftValue * 100.0f);
 }
 
 static void serialRxHandler(void)
@@ -98,64 +86,29 @@ static void serialRxHandler(void)
 static bool g_badInput;
 static void parseCommand(char* pCommand)
 {
-    MotorState rightMotor = g_rightMotor;
-    MotorState leftMotor = g_leftMotor;
+    float rightMotor = 0.0f;
+    float leftMotor = 0.0f;
 
     g_badInput = false;
 
-    rightMotor.input = parseMotorInput(&pCommand);
-    rightMotor.pulseWidth = parseMotorWidth(&pCommand);
+    rightMotor = parseMotorValue(&pCommand);
     skipWhitespace(&pCommand);
-    leftMotor.input = parseMotorInput(&pCommand);
-    leftMotor.pulseWidth = parseMotorWidth(&pCommand);
+    leftMotor = parseMotorValue(&pCommand);
     skipWhitespace(&pCommand);
-    float period = parseOptionalPeriod(pCommand, g_period);
+    float period = parseOptionalPeriod(pCommand, g_motor.getPeriod());
 
     if (g_badInput)
     {
         // Stop the motor on bad input.
-        g_rightMotor.input = 0;
-        g_rightMotor.pulseWidth = 0.0f;
-        g_leftMotor.input = 0;
-        g_leftMotor.pulseWidth = 0.0f;
+        updateMotorOutputs(0.0f, 0.0f, period);
     }
     else
     {
-        g_rightMotor = rightMotor;
-        g_leftMotor = leftMotor;
-        g_period = period;
+        updateMotorOutputs(rightMotor, leftMotor, period);
     }
-
-    updateMotorOutputs();
 }
 
-static uint32_t parseMotorInput(char** ppCommand)
-{
-    char     ch = **ppCommand;
-    uint32_t retVal = 0;
-
-    switch (tolower(ch))
-    {
-    case 'f':
-        retVal = 2;
-        break;
-    case 'r':
-        retVal = 1;
-        break;
-    case '-':
-        retVal = 3;
-        break;
-    default:
-        g_badInput = true;
-        break;
-    }
-
-    if (ch != '\0')
-        (*ppCommand)++;
-    return retVal;
-}
-
-static float parseMotorWidth(char** ppCommand)
+static float parseMotorValue(char** ppCommand)
 {
     char* pCommand = *ppCommand;
     char* pEnd = pCommand;
