@@ -16,6 +16,7 @@
 */
 #include <ctype.h>
 #include <mbed.h>
+#include "Encoders.h"
 #include "Motor.h"
 
 // Set to 1 to have serial data echoed back to terminal.
@@ -24,8 +25,8 @@
 // Default motor PWM period.
 #define PWM_PERIOD (1.0f / 20000.0f)
 
-static Serial       g_serial(USBTX, USBRX);
-static Motor        g_motor(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
+static Serial g_serial(USBTX, USBRX);
+static Motor  g_motor(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
 
 static void updateMotorOutputs(float rightValue, float leftValue, float period);
 static void serialRxHandler(void);
@@ -36,6 +37,8 @@ static float parseOptionalPeriod(char* pCommand, float defaultVal);
 
 int main()
 {
+    Encoders<p12, p11, p13, p14> encoders;
+
     g_serial.baud(230400);
 
     updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
@@ -43,6 +46,9 @@ int main()
 
     for (;;)
     {
+        wait(2.0f);
+        EncoderCounts encoderCounts = encoders.getAndClearEncoderCounts();
+        printf("%ld, %ld\n", encoderCounts.encoder1Count, encoderCounts.encoder2Count);
     }
 
     return 0;
