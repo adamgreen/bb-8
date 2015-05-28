@@ -18,50 +18,106 @@
 #include <mbed.h>
 #include "Encoders.h"
 #include "Motor.h"
+#include "PID.h"
 
 // Set to 1 to have serial data echoed back to terminal.
-#define SERIAL_ECHO 1
+#define SERIAL_ECHO 0
 
 // Default motor PWM period.
 #define PWM_PERIOD (1.0f / 20000.0f)
 
-static Serial g_serial(USBTX, USBRX);
-static Motor  g_motor(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
+// Interval between PID updates (in seconds).
+#define PID_INTERVAL (1.0f / 100.0f)
 
-static void updateMotorOutputs(float rightValue, float leftValue, float period);
+struct TickInfo
+{
+    uint32_t      time;
+    EncoderCounts counts;
+    float         leftPWM;
+    float         rightPWM;
+    float         leftSetPoint;
+    float         rightSetPoint;
+};
+
+static Serial                       g_serial(USBTX, USBRX);
+static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
+static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
+static Motor                        g_motors(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
+static Encoders<p12, p11, p13, p14> g_encoders;
+static volatile TickInfo            g_tick;
+static bool                         g_enableLogging = false;
+
+static void tickHandler();
+static void updateMotorOutputs(float leftValue, float rightValue, float period);
 static void serialRxHandler(void);
 static void parseCommand(char* pCommand);
-static float parseMotorValue(char** ppCommand);
+static void parseManualCommand(char* pCommand);
+static float parseFloatValue(char** ppCommand);
 static void skipWhitespace(char** ppCommand);
 static float parseOptionalPeriod(char* pCommand, float defaultVal);
+static void parseSetPointCommand(char* pCommand);
+static void displayHelp();
 
 int main()
 {
-    Encoders<p12, p11, p13, p14> encoders;
+    Ticker ticker;
 
     g_serial.baud(230400);
 
     updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
     g_serial.attach(serialRxHandler);
 
+    bool wasLoggingEnabled = g_enableLogging;
+    uint32_t lastTick = g_tick.time;
+    ticker.attach(tickHandler, PID_INTERVAL);
+
     for (;;)
     {
-        wait(2.0f);
-        EncoderCounts encoderCounts = encoders.getAndClearEncoderCounts();
-        printf("%ld, %ld\n", encoderCounts.encoder1Count, encoderCounts.encoder2Count);
+        // Wait for next tick update interrupt to be handled.
+        while (lastTick == g_tick.time)
+        {
+        }
+        lastTick = g_tick.time;
+
+        if (g_enableLogging)
+        {
+            if (!wasLoggingEnabled && g_enableLogging)
+            {
+                // Just turned logging on so dump column headings.
+                printf("time,leftSetPoint,leftPWM,leftEncoder,rightSetPoint,rightPWM,rightEncoder\n");
+            }
+            printf("%lu,%.2f,%.2f,%ld,%.2f,%.2f,%ld\n",
+                   g_tick.time,
+                   g_tick.leftPWM, g_tick.leftSetPoint, g_tick.counts.encoder1Count,
+                   g_tick.rightPWM, g_tick.rightSetPoint, g_tick.counts.encoder2Count);
+        }
+        wasLoggingEnabled = g_enableLogging;
     }
 
     return 0;
 }
 
-static void updateMotorOutputs(float rightValue, float leftValue, float period)
+static void tickHandler()
 {
-    g_motor.setPeriod(period);
-    g_motor.set(leftValue, rightValue);
+    EncoderCounts encoderCounts = g_encoders.getAndClearEncoderCounts();
+    g_motors.set(g_leftPID.compute(encoderCounts.encoder1Count), g_rightPID.compute(encoderCounts.encoder2Count));
 
-    printf("frequency = %f\n", 1.0f / period);
-    printf("    right = %f\n", rightValue * 100.0f);
-    printf("     left = %f\n", leftValue * 100.0f);
+    g_tick.counts.encoder1Count = encoderCounts.encoder1Count;
+    g_tick.counts.encoder2Count = encoderCounts.encoder2Count;
+    g_tick.leftPWM = g_leftPID.getControlOutput();
+    g_tick.rightPWM = g_rightPID.getControlOutput();
+    g_tick.leftSetPoint = g_leftPID.getSetPoint();
+    g_tick.rightSetPoint = g_rightPID.getSetPoint();
+    g_tick.time++;
+}
+
+static void updateMotorOutputs(float leftValue, float rightValue, float period)
+{
+    g_motors.setPeriod(period);
+    g_leftPID.setOutputManually(leftValue);
+    g_rightPID.setOutputManually(rightValue);
+
+    printf("Manual PWM Mode - PWM frequency = %f\n", 1.0f / period);
 }
 
 static void serialRxHandler(void)
@@ -92,39 +148,68 @@ static void serialRxHandler(void)
 static bool g_badInput;
 static void parseCommand(char* pCommand)
 {
-    float rightMotor = 0.0f;
-    float leftMotor = 0.0f;
-
+    char cmd = *pCommand++;
     g_badInput = false;
-
-    rightMotor = parseMotorValue(&pCommand);
-    skipWhitespace(&pCommand);
-    leftMotor = parseMotorValue(&pCommand);
-    skipWhitespace(&pCommand);
-    float period = parseOptionalPeriod(pCommand, g_motor.getPeriod());
+    switch (tolower(cmd))
+    {
+    case 'a':
+        printf("Enabling PID automatic mode\n");
+        g_leftPID.enableAutomaticMode();
+        g_rightPID.enableAutomaticMode();
+        break;
+    case 'l':
+        g_enableLogging = !g_enableLogging;
+        break;
+    case 'm':
+        parseManualCommand(pCommand);
+        break;
+    case 's':
+        parseSetPointCommand(pCommand);
+        break;
+    case 'h':
+    case '?':
+        displayHelp();
+        break;
+    default:
+        g_badInput = true;
+        break;
+    }
 
     if (g_badInput)
     {
-        // Stop the motor on bad input.
-        updateMotorOutputs(0.0f, 0.0f, period);
-    }
-    else
-    {
-        updateMotorOutputs(rightMotor, leftMotor, period);
+        // Stop the motor on any bad/unrecognized input.
+        updateMotorOutputs(0.0f, 0.0f, g_motors.getPeriod());
     }
 }
 
-static float parseMotorValue(char** ppCommand)
+static void parseManualCommand(char* pCommand)
+{
+    float rightPWM = 0.0f;
+    float leftPWM = 0.0f;
+
+    leftPWM = parseFloatValue(&pCommand) / 100.0f;
+    skipWhitespace(&pCommand);
+    rightPWM = parseFloatValue(&pCommand) / 100.0f;
+    skipWhitespace(&pCommand);
+    float period = parseOptionalPeriod(pCommand, g_motors.getPeriod());
+
+    if (!g_badInput)
+    {
+        updateMotorOutputs(leftPWM, rightPWM, period);
+    }
+}
+
+static float parseFloatValue(char** ppCommand)
 {
     char* pCommand = *ppCommand;
     char* pEnd = pCommand;
 
-    float width = strtof(pCommand, &pEnd);
+    float value = strtof(pCommand, &pEnd);
     if (pEnd == pCommand)
         g_badInput = true;
     *ppCommand = pEnd;
 
-    return width / 100.0f;
+    return value;
 }
 
 static void skipWhitespace(char** ppCommand)
@@ -149,4 +234,30 @@ static float parseOptionalPeriod(char* pCommand, float defaultVal)
     }
 
     return 1.0f / freq;
+}
+
+static void parseSetPointCommand(char* pCommand)
+{
+    float left = 0.0f;
+    float right = 0.0f;
+
+    left = parseFloatValue(&pCommand);
+    skipWhitespace(&pCommand);
+    right = parseFloatValue(&pCommand);
+
+    if (!g_badInput)
+    {
+        printf("Update SetPoint\n");
+        g_leftPID.updateSetPoint(left);
+        g_rightPID.updateSetPoint(right);
+    }
+}
+
+static void displayHelp()
+{
+    printf("Help\n"
+           "       manual motor setting: m leftPWM rightPWM (period)\n"
+           "      toggle logging on/off: l\n"
+           "toggle automatic PID on/off: a\n"
+           "           update set point: s leftRate rightRate\n");
 }
