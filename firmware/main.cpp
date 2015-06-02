@@ -49,13 +49,15 @@ struct TickInfo
 };
 
 static Serial                       g_serial(USBTX, USBRX);
-static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
-static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
-static Motor                        g_motors(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
-static Encoders<p12, p11, p13, p14> g_encoders;
 static MPU6050                      g_mpu(p9, p10);
 static InterruptIn                  g_imuReady(p8);
 static DigitalOut                   g_imuActiveLED(LED1);
+static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
+static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
+static Motor                        g_motors(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
+// Note: Encoders object should be constructed after any other objects using InterruptIn so that the interrupt
+//       handlers get chained together properly.
+static Encoders<p12, p11, p13, p14> g_encoders;
 
 static volatile TickInfo            g_tick;
 static bool                         g_enableLogging = false;
