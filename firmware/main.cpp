@@ -21,6 +21,7 @@
 #include "Motor.h"
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "PID.h"
+#include "PwmIn.h"
 
 // Set to 1 to have serial data echoed back to terminal.
 #define SERIAL_ECHO 0
@@ -34,24 +35,37 @@
 // Set to non-zero if you want to see raw gyro readings dumped to get a feel for drift.
 #define DUMP_GYRO_RATINGS 0
 
+// Maximum and minimum PWM duty cycles seen from Turnigy RC receiver.
+// Set both to zero if you want to disable scaling of the PWM duty cycle to a range of -1.0f to 1.0f.
+#define PWM_DUTY_CYCLE_MIN 0.0530f
+#define PWM_DUTY_CYCLE_MAX 0.0951f
+
 #ifndef M_PI
 const float M_PI = 3.14159265f;
 #endif
 
 struct TickInfo
 {
-    uint32_t      time;
-    EncoderCounts counts;
-    float         leftPWM;
-    float         rightPWM;
-    float         leftSetPoint;
-    float         rightSetPoint;
+    volatile uint32_t   time;
+    EncoderCounts       counts;
+    float               leftPWM;
+    float               rightPWM;
+    float               leftSetPoint;
+    float               rightSetPoint;
+    Quaternion          quaternion;
 };
 
-static Serial                       g_serial(USBTX, USBRX);
+// MRI will take care of initializing the UART if has been linked into the program.
+#if !MRI_ENABLE
+    static Serial g_serial(USBTX, USBRX);
+    #define INIT_SERIAL_BAUD(BAUD) g_serial.baud(BAUD)
+#else
+    #define INIT_SERIAL_BAUD(BAUD) (void)0
+#endif // !MRI_ENABLE
+
 static MPU6050                      g_mpu(p9, p10);
-static InterruptIn                  g_imuReady(p8);
-static DigitalOut                   g_imuActiveLED(LED1);
+static PwmIn                        g_radioYaw(p15);
+static PwmIn                        g_radioPitch(p16);
 static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
 static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
 static Motor                        g_motors(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
@@ -59,18 +73,16 @@ static Motor                        g_motors(p22, p29, p30, p21, p27, p26, p28, 
 //       handlers get chained together properly.
 static Encoders<p12, p11, p13, p14> g_encoders;
 
-static volatile TickInfo            g_tick;
+static TickInfo                     g_tick;
 static bool                         g_enableLogging = false;
-
-// Used to communicate state between IMU packet interrupt handler and main code.
 static uint16_t                     g_packetSize = 0;
-static Quaternion                   g_latestQuaternion;
-static volatile uint32_t            g_packetCount = 0;
 static volatile uint32_t            g_overflowCount = 0;
-static volatile uint32_t            g_spuriousCount = 0;
 
+static float scalePwmDutyCycle(float dutyCycle);
+static void initInterruptPriorities();
 static int initIMU();
 static void tickHandler();
+static void readLatestImuPacket(Quaternion* pQuaternion);
 static void updateMotorOutputs(float leftValue, float rightValue, float period);
 static void serialRxHandler(void);
 static void parseCommand(char* pCommand);
@@ -80,23 +92,29 @@ static void skipWhitespace(char** ppCommand);
 static float parseOptionalPeriod(char* pCommand, float defaultVal);
 static void parseSetPointCommand(char* pCommand);
 static void displayHelp();
-static void imuPacketHandler();
 
 
 int main()
 {
     Ticker ticker;
 
-    g_serial.baud(230400);
+    INIT_SERIAL_BAUD(230400);
+    initInterruptPriorities();
 
     int imuStatus = initIMU();
     if (imuStatus != 0)
+    {
+        printf("error: Failed to initialize IMU.  Shutting down.\n");
         return imuStatus;
+    }
 
     updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
+
+    // UNDONE: I will need to completely replace this serial method of getting commands as it isn't compatible with
+    //         MRI / GDB.
     g_serial.attach(serialRxHandler);
 
-    bool wasLoggingEnabled = g_enableLogging;
+    bool wasLoggingEnabled = false;
     uint32_t lastTick = g_tick.time;
     ticker.attach(tickHandler, PID_INTERVAL);
 
@@ -113,20 +131,23 @@ int main()
             if (!wasLoggingEnabled && g_enableLogging)
             {
                 // Just turned logging on so dump column headings.
-                printf("time,leftSetPoint,leftPWM,leftEncoder,rightSetPoint,rightPWM,rightEncoder,yaw,pitch,roll\n");
+                printf("time,leftSetPoint,leftPWM,leftEncoder,rightSetPoint,rightPWM,rightEncoder,"
+                       "yaw,pitch,roll,radioYaw,radioPitch\n");
             }
 
             VectorFloat gravity;
             float       ypr[3];
-            g_mpu.dmpGetGravity(&gravity, &g_latestQuaternion);
-            g_mpu.dmpGetYawPitchRoll(ypr, &g_latestQuaternion, &gravity);
-            printf("%lu,%.2f,%.2f,%ld,%.2f,%.2f,%ld,%.2f,%.2f,%.2f\n",
+            g_mpu.dmpGetGravity(&gravity, &g_tick.quaternion);
+            g_mpu.dmpGetYawPitchRoll(ypr, &g_tick.quaternion, &gravity);
+            printf("%lu,%.2f,%.2f,%ld,%.2f,%.2f,%ld,%.2f,%.2f,%.2f,%.2f,%.2f\n",
                    g_tick.time,
                    g_tick.leftPWM, g_tick.leftSetPoint, g_tick.counts.encoder1Count,
                    g_tick.rightPWM, g_tick.rightSetPoint, g_tick.counts.encoder2Count,
                    ypr[0] * 180.0f/M_PI,
                    ypr[1] * 180.0f/M_PI,
-                   ypr[2] * 180.0f/M_PI);
+                   ypr[2] * 180.0f/M_PI,
+                   scalePwmDutyCycle(g_radioYaw.getDutyCycle()),
+                   scalePwmDutyCycle(g_radioPitch.getDutyCycle()));
 
             // Can be useful to dump gyro values to determine drift.
             if (DUMP_GYRO_RATINGS)
@@ -142,46 +163,66 @@ int main()
     return 0;
 }
 
+static float scalePwmDutyCycle(float dutyCycle)
+{
+    if (PWM_DUTY_CYCLE_MIN != 0.0f && PWM_DUTY_CYCLE_MAX != 0.0f)
+    {
+        static const float min = PWM_DUTY_CYCLE_MIN;
+        static const float max = PWM_DUTY_CYCLE_MAX;
+        static const float center = (min + max) / 2.0f;
+
+        float scaledResult = (dutyCycle - center) * 2.0f / (max - min);
+        if (scaledResult < -1.0f)
+            scaledResult = -1.0f;
+        else if (scaledResult > 1.0f)
+            scaledResult = 1.0f;
+        return scaledResult;
+    }
+    else
+    {
+        return dutyCycle;
+    }
+}
+
+static void initInterruptPriorities()
+{
+    // Time critical GPIO interrupts are given highest priority.
+    // Getting data in from serial port is lowest priority.
+    NVIC_SetPriority(EINT3_IRQn, 1);
+    NVIC_SetPriority(TIMER3_IRQn, 2);
+    if (!MRI_ENABLE)
+        NVIC_SetPriority(UART0_IRQn, 3);
+}
+
 static int initIMU()
 {
-    printf("Initializing I2C devices...\r\n");
     g_mpu.initialize();
 
-    printf("Testing device connections...\r\n");
-    if (g_mpu.testConnection())
-        printf("MPU6050 connection successful\r\n");
-    else
-        printf("MPU6050 connection failed\r\n");
+    if (!g_mpu.testConnection())
+        printf("error: MPU6050 connection failed\r\n");
 
-    printf("Initializing DMP...\r\n");
     uint8_t devStatus = g_mpu.dmpInitialize();
     if (devStatus != 0)
     {
-        // ERROR!
-        // 1 = initial memory load failed
-        // 2 = DMP configuration updates failed
-        // (if it's going to break, usually the code will be 1)
-        printf("DDMP Initialization failed (code %d)\r\n", devStatus);
+        // How to interpret failure code:
+        //  1 = initial memory load failed
+        //  2 = DMP configuration updates failed.
+        // If it's going to break, usually the code will be 1.
+        printf("error: DMP Initialization failed (code %d)\n", devStatus);
         return devStatus;
     }
 
-    printf("Setting gyro bias to reduce drift.\r\n");
+    // Setting gyro bias to reduce drift.
 	g_mpu.setXGyroOffsetTC(7);
 	g_mpu.setYGyroOffsetTC(-4);
 	g_mpu.setZGyroOffsetTC(11);
 
-    printf("Enabling DMP...\r\n");
     g_mpu.setDMPEnabled(true);
-
-    printf("Enabling interrupt detection...\r\n");
-    g_imuReady.rise(&imuPacketHandler);
 
     // Clear any already pending interrupt bits.
     g_mpu.getIntStatus();
 
-    printf("DMP ready!\r\n");
-
-    // get expected DMP packet size for later comparison
+    // Get expected DMP packet size for later comparison.
     g_packetSize = g_mpu.dmpGetFIFOPacketSize();
 
     return 0;
@@ -198,7 +239,35 @@ static void tickHandler()
     g_tick.rightPWM = g_rightPID.getControlOutput();
     g_tick.leftSetPoint = g_leftPID.getSetPoint();
     g_tick.rightSetPoint = g_rightPID.getSetPoint();
+    readLatestImuPacket(&g_tick.quaternion);
     g_tick.time++;
+}
+
+static void readLatestImuPacket(Quaternion* pQuaternion)
+{
+    uint8_t  fifoBuffer[64];
+
+    uint8_t g_mpuIntStatus = g_mpu.getIntStatus();
+    uint16_t fifoCount = g_mpu.getFIFOCount();
+    if ((g_mpuIntStatus & 0x10) || fifoCount == 1024)
+    {
+        // Hit FIFO overflow - this shouldn't happen unless this interrupt handler is too slow.
+        g_overflowCount++;
+        g_mpu.resetFIFO();
+        return;
+    }
+
+    // Read all available IMU packets.  We care about the latest one.
+    while (fifoCount >= g_packetSize)
+    {
+        g_mpu.getFIFOBytes(fifoBuffer, g_packetSize);
+
+        // Track FIFO count here in case there is > 1 packet available.
+        fifoCount -= g_packetSize;
+
+        // Parse out the g_latestQuaternionuaternion into global variable.
+        g_mpu.dmpGetQuaternion(pQuaternion, fifoBuffer);
+    }
 }
 
 static void updateMotorOutputs(float leftValue, float rightValue, float period)
@@ -350,44 +419,4 @@ static void displayHelp()
            "      toggle logging on/off: l\n"
            "toggle automatic PID on/off: a\n"
            "           update set point: s leftRate rightRate\n");
-}
-
-static void imuPacketHandler()
-{
-    uint8_t  fifoBuffer[64];
-
-    uint8_t g_mpuIntStatus = g_mpu.getIntStatus();
-    uint16_t fifoCount = g_mpu.getFIFOCount();
-    if ((g_mpuIntStatus & 0x10) || fifoCount == 1024)
-    {
-        // Hit FIFO overflow - this shouldn't happen unless this interrupt handler is too slow.
-        g_overflowCount++;
-        g_mpu.resetFIFO();
-        return;
-    }
-    else if (0 == (g_mpuIntStatus & 0x02))
-    {
-        // Didn't receive an interrupt indicating that FIFO has data to read.
-        g_spuriousCount++;
-        return;
-    }
-
-    // Wait for correct available data length, should be a VERY short wait.
-    while (fifoCount < g_packetSize)
-        fifoCount = g_mpu.getFIFOCount();
-
-    while (fifoCount >= g_packetSize)
-    {
-        g_mpu.getFIFOBytes(fifoBuffer, g_packetSize);
-
-        // Track FIFO count here in case there is > 1 packet available.
-        fifoCount -= g_packetSize;
-
-        // Parse out the g_latestQuaternionuaternion into global variable.
-        g_mpu.dmpGetQuaternion(&g_latestQuaternion, fifoBuffer);
-        g_packetCount++;
-
-        // blink LED to indicate activity
-        g_imuActiveLED = !g_imuActiveLED;
-    }
 }

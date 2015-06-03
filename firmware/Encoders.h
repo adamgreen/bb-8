@@ -131,9 +131,9 @@ protected:
         uint32_t fall0 = *pFall0;
 
         // Calculate the mask for these 4 pins on port 0.
-        uint32_t encoder1Mask = (1 << (encoder1Pin1 & 0x1F)) | (1 << (encoder1Pin2 & 0x1F));
-        uint32_t encoder2Mask = (1 << (encoder2Pin1 & 0x1F)) | (1 << (encoder2Pin2 & 0x1F));
-        uint32_t encoderMask = encoder1Mask | encoder2Mask;
+        static const uint32_t encoder1Mask = (1 << (encoder1Pin1 & 0x1F)) | (1 << (encoder1Pin2 & 0x1F));
+        static const uint32_t encoder2Mask = (1 << (encoder2Pin1 & 0x1F)) | (1 << (encoder2Pin2 & 0x1F));
+        static const uint32_t encoderMask = encoder1Mask | encoder2Mask;
 
         // Check to see if any of the encoder signals have changed.
         if ((rise0 & encoderMask) || (fall0 & encoderMask))
