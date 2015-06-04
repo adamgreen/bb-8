@@ -25,6 +25,36 @@ Above image from
 [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Make This Mini Star Wars BB-8 Ball Droid with a Hacked Sphero by Christian Poulsen]]\\
 [[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | BB-8 Construction Conversation on Hackaday]]\\
 [[https://github.com/adamgreen/bb-8#clone-this-repo-and-its-submodules | How to Clone this GitHub Repository]]\\
+[[http://www.controlguru.com | Control Guru PID Notes]]\\
+[[http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/ | Brett Beauregard's PID Notes]]\\
+
+
+
+==June 3, 2015
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150603-01.jpg}}\\
+
+===Some progress has been made
+I know that it has been awhile since I logged anything here but I have actually been working on my BB-8 project.  A few
+weeks ago I received many of the electronic components that I plan to use in my 10" prototype.  These components
+include:
+* [[https://www.pololu.com/product/713 | TB6612FNG motor controller]]
+* [[https://www.pololu.com/product/2598 | Magnetic Shaft Encoders]]
+* [[https://www.sparkfun.com/products/11486 | Sparkfun MPU-9150 based 9DoF IMU]]
+* [[http://www.hobbyking.com/hobbyking/store/__8992__Turnigy_9X_9Ch_Transmitter_w_Module_8ch_Receiver_Mode_2_v2_Firmware_.html | Turnigy 9X RC Radio]]
+
+Since receiving these electronic components, I have been wiring them up on my breadboard and writing lower level
+software drivers to interface with them.  I want to make sure that they all work as expected and share the CPU resources
+well before I start placing everything inside of my droid.  The
+[[https://github.com/adamgreen/bb-8/blob/edc7e1b148c6f49d9adf761e39f721762fd7e1e6/firmware/main.cpp | current firmware]]
+has the ability to log the sensor data (IMU, shaft encoder counts, RC radio commands) to the serial port while also
+allowing the user to manipulate the motors via direct PWM manipulation or via velocity set points in the PID algorithm.
+One of the new areas for me when working on this code was the proper implementation and configuration of PID loops.  I
+found these two resources to be very helpful:
+* [[http://www.controlguru.com]] - How to model your system to calculate PID parameters.
+* [[http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/]] - How to implement a PID algorithm.
+
+I am almost done with this preliminary software work and will soon begin building a 10" replica of the Sphero control
+system (just motion with no head).
 
 
 
