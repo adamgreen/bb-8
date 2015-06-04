@@ -25,6 +25,7 @@ public:
         m_highTime = 0;
         m_lowTime = 0;
         m_dutyCycle = 0.0f;
+        m_hasTimedOut = true;
         m_timer.start();
         m_interruptIn.rise(this, &PwmIn::risingEdgeHandler);
         m_interruptIn.fall(this, &PwmIn::fallingEdgeHandler);
@@ -35,12 +36,22 @@ public:
         return m_dutyCycle;
     }
 
+    bool hasTimedOut(uint32_t usecTimeOut)
+    {
+        // Only bother to check for time-out if a timeout hasn't already been detected.
+        // The timeout will be cleared the next time a pulse is detected.
+        if (!m_hasTimedOut)
+            m_hasTimedOut = (uint32_t)m_timer.read_us() > usecTimeOut;
+        return m_hasTimedOut;
+    }
+
 protected:
     void risingEdgeHandler()
     {
         m_lowTime = m_timer.read_us();
         m_timer.reset();
         m_dutyCycle = (float)m_highTime / (float)(m_highTime + m_lowTime);
+        m_hasTimedOut = false;
     }
 
     void fallingEdgeHandler()
@@ -54,6 +65,7 @@ protected:
     uint32_t    m_highTime;
     uint32_t    m_lowTime;
     float       m_dutyCycle;
+    bool        m_hasTimedOut;
 };
 
 #endif // PWM_IN_H_

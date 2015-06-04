@@ -40,6 +40,10 @@
 #define PWM_DUTY_CYCLE_MIN 0.0530f
 #define PWM_DUTY_CYCLE_MAX 0.0951f
 
+// The radio should send a pulse 50 times a second so if we go 1/25th of a second without receiving 1 then flag as a
+// time out.
+#define RADIO_TIMEOUT (1000000 / 25)
+
 #ifndef M_PI
 const float M_PI = 3.14159265f;
 #endif
@@ -146,8 +150,8 @@ int main()
                    ypr[0] * 180.0f/M_PI,
                    ypr[1] * 180.0f/M_PI,
                    ypr[2] * 180.0f/M_PI,
-                   scalePwmDutyCycle(g_radioYaw.getDutyCycle()),
-                   scalePwmDutyCycle(g_radioPitch.getDutyCycle()));
+                   g_radioYaw.hasTimedOut(RADIO_TIMEOUT) ? 0.0f : scalePwmDutyCycle(g_radioYaw.getDutyCycle()),
+                   g_radioPitch.hasTimedOut(RADIO_TIMEOUT) ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()));
 
             // Can be useful to dump gyro values to determine drift.
             if (DUMP_GYRO_RATINGS)
