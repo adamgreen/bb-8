@@ -60,6 +60,7 @@ struct TickInfo
 };
 
 // MRI will take care of initializing the UART if has been linked into the program.
+// UNDONE: I am planning to move MRI to it's own UART in the future.
 #if !MRI_ENABLE
     static Serial g_serial(USBTX, USBRX);
     #define INIT_SERIAL_BAUD(BAUD) g_serial.baud(BAUD)
@@ -68,14 +69,14 @@ struct TickInfo
 #endif // !MRI_ENABLE
 
 static MPU6050                      g_mpu(p9, p10);
-static PwmIn                        g_radioYaw(p15);
-static PwmIn                        g_radioPitch(p16);
+static PwmIn                        g_radioYaw(p17);
+static PwmIn                        g_radioPitch(p18);
 static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
 static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
-static Motor                        g_motors(p22, p29, p30, p21, p27, p26, p28, PWM_PERIOD);
+static Motor                        g_motors(p22, p29, p30, p21, p20, p19, p26, PWM_PERIOD);
 // Note: Encoders object should be constructed after any other objects using InterruptIn so that the interrupt
 //       handlers get chained together properly.
-static Encoders<p12, p11, p13, p14> g_encoders;
+static Encoders<p12, p11, p15, p16> g_encoders;
 
 static TickInfo                     g_tick;
 static bool                         g_enableLogging = false;
@@ -255,13 +256,13 @@ static void readLatestImuPacket(Quaternion* pQuaternion)
     uint16_t fifoCount = g_mpu.getFIFOCount();
     if ((g_mpuIntStatus & 0x10) || fifoCount == 1024)
     {
-        // Hit FIFO overflow - this shouldn't happen unless this interrupt handler is too slow.
+        // Hit FIFO overflow.
         g_overflowCount++;
         g_mpu.resetFIFO();
         return;
     }
 
-    // Read all available IMU packets.  We care about the latest one.
+    // Read all available IMU packets.  We only care about the latest one.
     while (fifoCount >= g_packetSize)
     {
         g_mpu.getFIFOBytes(fifoBuffer, g_packetSize);
