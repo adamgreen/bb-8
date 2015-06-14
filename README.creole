@@ -30,6 +30,98 @@ Above image from
 
 
 
+==June 14, 2015
+
+One of my more recent accomplishments on this project has been to move the electronics from this:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150614-01.jpg}}\\
+to this:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150614-02.jpg}}\\
+
+I didn't bother to take the time to create a schematic for the electronic parts that I have hacked together so far for
+this project.  I did however create a few tables to record how signals were routed around the solderless breadboard to
+help in the migration to the soldered protoboard.  What follows are the cheat sheets (tables) that I used for that
+migration.
+
+===mbed Pin Usage
+|= mbed pin |= Connection |= Notes |
+| p1 | Gnd | Ground Bus |
+| p5 - p8 | SPI | **Reserved for SD card** |
+| p9 | IMU SDA (3) |  |
+| p10 | IMU SCL (4) | |
+| p11 | Left Motor - OUT A | Gray Wire (3) |
+| p12 | Left Motor - OUT B | White Wire (2) |
+| p13 - p14 | UART | **Reserved for debug monitor** |
+| p15 | Right Motor - OUT A | Gray Wire (3) |
+| p16 | Right Motor - OUT B | White Wire (2) |
+| p17 | RC Channel 1 | Yaw Channel - Signal is White Wire (1) |
+| p18 | RC Channel 2 | Pitch Channel - Signal is White Wire (1) |
+| p19 | TB6612FNG BIN2 (11) | Right Motor |
+| p20 | TB6612FNG BIN1 (12) | Right Motor |
+| p21 | TB6612FNG PWMB (10) | Right Motor |
+| p22 | TB6612FNG PWMA (16) | Left Motor |
+| p23 - p25 | PwmIn | **Reserved for more RC Channels** |
+| p26 | TB6612FNG nSTBY (13) | |
+| p27 - p28 | UART | **Reserved for Head Controller** |
+| p29 | TB6612FNG AIN1 (14) | Left Motor |
+| p30 | TB6612FNG AIN2 (15) | Left Motor |
+| p31 - p38 | Ethernet & USB | Unused |
+| p39 | Vu | 5.0V USB Out - Unused |
+| p40 | Vout | 3.3V Bus |
+
+===RC Receiver Channel Headers
+|= RC Channel Wire Color |= Name |
+| White | PWM Signal |
+| Red | +5V |
+| Black | Ground |
+
+===IMU Pin Usage
+|= MPU9150 Signal |= Connected To |
+| p1 - Gnd | Ground |
+| p2 - VCC | mbed Vout 3.3V |
+| p3 - SDA | mbed p9 |
+| p4 - SCL | mbed p10 |
+| p5 - p11 | Not Connected |
+
+===Motor/Encoder Headers
+|= Motor/Encoder Wire Color |= Name |= Notes |
+| Black | GND | |
+| White | OUT B | Encoder Output 2 |
+| Gray | OUT A | Encoder Output 1 |
+| Purple | VCC | mbed Vout 3.3V |
+| Blue | M2 | Motor Output 2 |
+| Green | M1 | Motor Output 1 |
+
+===Motor Controller Pin Usage
+|= TB6612FNG Pin |= Connected To |= Notes |
+| 1 - Gnd | Ground Bus | |
+| 2 - VCC | mbed Vout | 3.3V |
+| 3 - A01 | Left Motor M2 | Left Blue |
+| 4 - A02 | Left Motor M1 | Left Green |
+| 5 - B02 | Right Motor M2 | Right Blue |
+| 6 - B01 | Right Motor M1 | Right Green |
+| 7 - VMOT | Battery + | Motor Power from Battery |
+| 8 - GND | Battery - | Motor Ground from Battery |
+| 9 - GND | Ground Bus | |
+| 10 - PWMB | mbed p21 | Right Motor |
+| 11 - BIN2 | mbed p19 | Right Motor |
+| 12 - BIN1 | mbed p20 | Right Motor |
+| 13 - nSTDBY | mbed p26 | Enable / Disable Controller |
+| 14 - AIN1 | mbed p29 | Left Motor |
+| 15 - AIN2 | mbed p30 | Left Motor |
+| 16 - PWMA | mbed p22 | Left Motor |
+
+===BLE UART
+I did spend some time since the last update here attempting to program a Nordic NRF51822 to act as a bridge between
+Bluetooth Low Energy (BLE) and the UART to make remote debugging easier.  I started with
+[[https://developer.mbed.org/teams/Bluetooth-Low-Energy/code/BLE_LoopbackUART/ | this mbed BLE Loopback UART sample]]
+and modified it to use the real hardware UART.  I also wrote a program for OS X which would connect to this NRF51822 via
+BLE and expose the serial connection as a TCP/IP socket.  The BLE connection would fail mysteriously during my initial
+testing and it looked like it would take some time to debug so I ended up shelving this project rather than letting it
+to continue distracting me from my current prototype build.  I hope to come back to it in the future since it showed
+some promise.  I will probably investigate a WiFi based solution in the near future.
+
+
+
 ==June 3, 2015
 {{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150603-01.jpg}}\\
 
