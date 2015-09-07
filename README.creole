@@ -1,7 +1,7 @@
 =BB-8 Droid Replica Project
 ==Overview
 This project is just a place for me to record any progress I make as I attempt to build a replica of the BB-8 droid from
-the new Star Wars The Force Awakens movie.
+the new //Star Wars: The Force Awakens// movie.
 
 {{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150424-01.jpg}}\\
 Above image from
@@ -18,6 +18,8 @@ Above image from
 
 ==Interesting Links
 [[https://www.youtube.com/watch?v=ABzjUf3E_0c | Video of BB-8 on stage at Star Wars Celebration 2015]]\\
+[[http://www.starwars.com/news/droid-dreams-how-neal-scanlan-and-the-star-wars-the-force-awakens-team-brought-bb-8-to-life | Interview with the creators of the BB-8 props used in The Force Awakens]]\\
+[[http://www.sphero.com/starwars | Buy your own Sphero BB-8 Toy Here!]]\\
 [[https://github.com/adamgreen/bb-8#may-8-2015 | My Sphero 1 Hacking]]\\
 [[https://github.com/adamgreen/bb-8#april-26-2015 | My Sphero 1 Teardown]]\\
 [[https://github.com/adamgreen/bb-8#sphero-2-teardown | My Sphero 2 Teardown]]\\
@@ -30,8 +32,31 @@ Above image from
 
 
 
-==June 14, 2015
+==September 7, 2015
+I think it is about time to get back at this BB-8 project now that the temperatures are starting to get cooler around
+here!
 
+A very interesting
+[[http://www.starwars.com/news/droid-dreams-how-neal-scanlan-and-the-star-wars-the-force-awakens-team-brought-bb-8-to-life | article recently appeared on the official Star Wars website]].
+It discusses the creation and filming of the BB-8 props with the creators themselves.  That article definitely
+definitely set me straight on some misconceptions that I had:
+* The BB-8 props, including the one seen on stage at Star Wars Celebration 2015, were all created by Neal Scanlan,
+  Joshua Lee, Matthew Denton, and others at the //Star Wars: The Force Awakens// creature shop.
+* It doesn't appear that Sphero was involved at all in the creation of the functional prop seen on stage at this year's
+  Star Wars Celebration event.
+* The functional version of BB-8 seen on stage was created just in time for the Star Wars Celebration 2015 event.  It
+  wasn't used in the movie itself.
+* The //Star Wars: The Force Awakens// creature shop created less functional versions of BB-8 to actually be used by the
+  puppeteers in the filming of the movie.  Previously I thought some of the scenes in the movie used a fully functional
+  prop as seen on stage at Celebration.
+
+===Sphero BB-8 Toy
+[[http://www.sphero.com/starwars | Sphero has created a BB-8 toy]] that became available for purchase on Force Friday,
+September 4th.  I have ordered one directly from the Sphero website but I don't yet have an ETA on its delivery.
+
+
+
+==June 14, 2015
 One of my more recent accomplishments on this project has been to move the electronics from this:\\
 {{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150614-01.jpg}}\\
 to this:\\
