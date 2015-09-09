@@ -333,7 +333,7 @@ Wars Celebration video.  The head just seems to levitate over the rolling spheri
 magical looking bots myself?
 
 ===How does it work?
-[[[[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | A great conversation started up on Hackaday]]
+[[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | A great conversation started up on Hackaday]]
 discussing how this BB-8 prop actually works.  The key takeaways that I got from the Hackaday comments were:
 * [[http://www.gosphero.com | Orbotix / Sphero]] is the company behind the functional BB-8 prop.
 * Orbotix / Sphero already markets [[http://www.gosphero.com/sphero/ | a spherical robotic toy]] that works like the
