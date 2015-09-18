@@ -25,10 +25,25 @@ Above image from
 [[https://github.com/adamgreen/bb-8#sphero-2-teardown | My Sphero 2 Teardown]]\\
 [[http://astromech.net | Astromech.net - The Official Website of the R2-D2 Builders Club]]\\
 [[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Make This Mini Star Wars BB-8 Ball Droid with a Hacked Sphero by Christian Poulsen]]\\
+[[https://www.youtube.com/watch?v=iAtXdhUT3IM | UBREAKIFIX teardown of Sphero BB-8 toy]]\\
 [[http://hackaday.com/2015/04/19/bb-8-is-real-but-how-did-they-do-it/ | BB-8 Construction Conversation on Hackaday]]\\
 [[https://github.com/adamgreen/bb-8#clone-this-repo-and-its-submodules | How to Clone this GitHub Repository]]\\
 [[http://www.controlguru.com | Control Guru PID Notes]]\\
 [[http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/ | Brett Beauregard's PID Notes]]\\
+
+
+
+==September 17, 2015
+I received my [[http://www.sphero.com/starwars | Sphero BB-8 toy]] earlier this week.  Here are some photos of my new
+toy:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150917-01.jpg}}
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150917-02.jpg}}\\
+
+The abilities of this cool little toy are pretty much similar to
+[[http://makezine.com/projects/make-this-mini-star-wars-bb-8-ball-droid-with-a-hacked-sphero/ | Christian Poulsen's hacked Sphero]].
+The head is just magnetically coupled to the cart via a fixed stem.  This means that it cannot be moved independently of
+the cart itself.  BB-8's head only rotates and tilts when the cart does the same within the sphere.  A teardown of this
+toy by UBREAKIFIX can be seen [[https://www.youtube.com/watch?v=iAtXdhUT3IM | here]].
 
 
 
