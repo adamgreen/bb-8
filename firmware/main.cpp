@@ -26,6 +26,9 @@
 // Set to 1 to have serial data echoed back to terminal.
 #define SERIAL_ECHO 0
 
+// Set to 1 to disable PID loop and brake motors when radio is turned off.
+#define BRAKE_ON_RADIO_TIMEOUT 1
+
 // Default motor PWM period.
 #define PWM_PERIOD (1.0f / 20000.0f)
 
@@ -171,9 +174,20 @@ int main()
         wasLoggingEnabled = g_enableLogging;
 
         // Set forward / reverse velocity based on pitch channel of radio.
-        float desiredVelocity = g_radioPitch.hasTimedOut(RADIO_TIMEOUT) ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()) * 20.0f;
-        g_leftPID.updateSetPoint(desiredVelocity);
-        g_rightPID.updateSetPoint(desiredVelocity);
+        bool hasRadioTimedOut = g_radioPitch.hasTimedOut(RADIO_TIMEOUT);
+        float desiredVelocity = hasRadioTimedOut ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()) * 20.0f;
+        if (BRAKE_ON_RADIO_TIMEOUT && hasRadioTimedOut)
+        {
+            g_leftPID.setOutputManually(0.0f);
+            g_rightPID.setOutputManually(0.0f);
+        }
+        else
+        {
+            g_leftPID.enableAutomaticMode();
+            g_rightPID.enableAutomaticMode();
+            g_leftPID.updateSetPoint(desiredVelocity);
+            g_rightPID.updateSetPoint(desiredVelocity);
+        }
     }
 
     return 0;
