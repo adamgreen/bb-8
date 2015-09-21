@@ -19,9 +19,14 @@
 class MotorChannel
 {
 public:
-    MotorChannel(PinName pwmPin, PinName input1Pin, PinName input2Pin, float period = 1.0f / 10000.0f) :
+    MotorChannel(PinName pwmPin,
+                 PinName input1Pin,
+                 PinName input2Pin,
+                 float maxPower = 1.0f,
+                 float period = 1.0f / 10000.0f) :
         m_pwm(pwmPin), m_input(input1Pin, input2Pin)
     {
+        m_maxPower = maxPower;
         setPeriod(period);
         set(0.0f);
     }
@@ -35,7 +40,11 @@ public:
     {
         m_value = value;
         m_input.write(motorInputFromValue(value));
-        m_pwm.write(fabs(value));
+
+        float power = fabs(value);
+        if (power > m_maxPower)
+            power = m_maxPower;
+        m_pwm.write(power);
     }
 
     float get()
@@ -67,6 +76,7 @@ protected:
     PwmOut m_pwm;
     BusOut m_input;
     float  m_value;
+    float  m_maxPower;
 };
 
 
@@ -75,12 +85,13 @@ class Motor
 public:
     Motor(PinName channelAPwmPin, PinName channelAInput1Pin, PinName channelAInput2Pin,
           PinName channelBPwmPin, PinName channelBInput1Pin, PinName channelBInput2Pin,
-          PinName standbyPin, float period = 1.0f / 10000.0f) :
-        m_channelA(channelAPwmPin, channelAInput1Pin, channelAInput2Pin),
-        m_channelB(channelBPwmPin, channelBInput1Pin, channelBInput2Pin),
-        m_standby(standbyPin),
-        m_period(period)
+          PinName standbyPin,
+          float channelAMax = 1.0f, float channelBMax = 1.0f, float period = 1.0f / 10000.0f) :
+        m_channelA(channelAPwmPin, channelAInput1Pin, channelAInput2Pin, channelAMax),
+        m_channelB(channelBPwmPin, channelBInput1Pin, channelBInput2Pin, channelBMax),
+        m_standby(standbyPin)
     {
+        setPeriod(period);
         enable();
     }
 

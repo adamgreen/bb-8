@@ -29,6 +29,10 @@
 // Default motor PWM period.
 #define PWM_PERIOD (1.0f / 20000.0f)
 
+// Maximum motor output PWM duty cycle.
+// Useful for limiting amount of power to motors during early testing.
+#define MAX_MOTOR_POWER 0.25f
+
 // Interval between PID updates (in seconds).
 #define PID_INTERVAL (1.0f / 100.0f)
 
@@ -71,9 +75,9 @@ struct TickInfo
 static MPU6050                      g_mpu(p9, p10);
 static PwmIn                        g_radioYaw(p17);
 static PwmIn                        g_radioPitch(p18);
-static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
-static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -1.0f, 1.0f, PID_INTERVAL);
-static Motor                        g_motors(p22, p29, p30, p21, p20, p19, p26, PWM_PERIOD);
+static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
+static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
+static Motor                        g_motors(p22, p29, p30, p21, p20, p19, p26, MAX_MOTOR_POWER, MAX_MOTOR_POWER, PWM_PERIOD);
 // Note: Encoders object should be constructed after any other objects using InterruptIn so that the interrupt
 //       handlers get chained together properly.
 static Encoders<p12, p11, p15, p16> g_encoders;
