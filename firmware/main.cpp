@@ -114,6 +114,8 @@ int main()
     }
 
     updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
+    g_leftPID.enableAutomaticMode();
+    g_rightPID.enableAutomaticMode();
 
     // UNDONE: I will need to completely replace this serial method of getting commands as it isn't compatible with
     //         MRI / GDB.
@@ -163,6 +165,11 @@ int main()
             }
         }
         wasLoggingEnabled = g_enableLogging;
+
+        // Set forward / reverse velocity based on pitch channel of radio.
+        float desiredVelocity = g_radioPitch.hasTimedOut(RADIO_TIMEOUT) ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()) * 20.0f;
+        g_leftPID.updateSetPoint(desiredVelocity);
+        g_rightPID.updateSetPoint(desiredVelocity);
     }
 
     return 0;
