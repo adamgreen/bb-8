@@ -145,7 +145,7 @@ int main()
             if (!wasLoggingEnabled && g_enableLogging)
             {
                 // Just turned logging on so dump column headings.
-                printf("time,leftSetPoint,leftPWM,leftEncoder,rightSetPoint,rightPWM,rightEncoder,"
+                printf("time,leftPWM,leftSetPoint,leftEncoder,rightPWM,rightSetPoint,rightEncoder,"
                        "yaw,pitch,roll,radioYaw,radioPitch\n");
             }
 
