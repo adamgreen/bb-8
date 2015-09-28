@@ -33,6 +33,101 @@ Above image from
 
 
 
+==September 27, 2015
+I needed to be able to source more current for my motors so I replaced the TB6612FNG motor driver with a VNH3SP30 motor
+driver.  I initially hacked it in through the use of a solder-less breadboard and several hookup wires:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150927-01.jpg}}\\
+I used that configuration to perform some basic testing of the motor/encoder and then replaced the driver on the actual
+soldered protoboard so that it could standup to being inside my ball bot:\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150927-02.jpg}}\\
+
+I still haven't bothered to create a schematic for my current electronics but I did update my tables of connections for
+the key devices on the board.  What follows are those updated wiring tables:
+===mbed Pin Usage
+|= mbed pin |= Connection               |= Notes |
+| p1        | Gnd                       | Ground Bus |
+| p2        | Vin - 5V                  | Connected to 5V BEC |
+| p5 - p8   | SPI                       | **Reserved for SD card** |
+| p9        | IMU SDA (3)               | |
+| p10       | IMU SCL (4)               | |
+| p11       | Left Motor - Encoder A    | Yellow Wire (5) |
+| p12       | Left Motor - Encoder B    | White Wire (6) |
+| p13 - p14 | UART                      | **Reserved for debug monitor** |
+| p15       | Right Motor - Encoder A   | Yellow Wire (5) |
+| p16       | Right Motor - Encoder B   | White Wire (6) |
+| p17       | RC Channel 1              | Yaw Channel - Signal is White Wire (1) |
+| p18       | RC Channel 2              | Pitch Channel - Signal is White Wire (1) |
+| p19       | VNH3SP30 2INb (13)        | Right Motor (Level Shift) |
+| p20       | VNH3SP30 2INa (14)        | Right Motor (Level Shift) |
+| p21       | VNH3SP30 2PWM (12)        | Right Motor (Level Shift) |
+| p22       | VNH3SP30 1PWM (4)         | Left Motor (Level Shift) |
+| p23 - p25 | PwmIn                     | **Reserved for more RC Channels** |
+| p26       | VNH3SP30 Enables (1 & 15) | Connect both motor enables together (Level Shift) |
+| p27 - p28 | UART                      | **Reserved for Head Controller** |
+| p29       | VNH3SP30 1INa (2)         | Left Motor (Level Shift) |
+| p30       | VNH3SP30 1INb (3)         | Left Motor (Level Shift) |
+| p31 - p38 | Ethernet & USB            | Unused |
+| p39       | Vu                        | 5.0V USB Out - Unused |
+| p40       | Vout                      | 3.3V Bus |
+
+===Motor/Encoder Headers
+|= Motor/Encoder Wire Color |= Name       |= Notes |
+| Red                       | M1          | Motor Output 1 |
+| Black                     | M2          | Motor Output 2 |
+| Green                     | Gnd         | Encoder Ground |
+| Blue                      | Encoder Vcc | mbed Vin 5.0V |
+| Yellow                    | Encoder A   | Encoder Output 1 |
+| White                     | Encoder B   | Encoder Output 2 |
+
+===Motor Controller Pin Usage
+|= VNH3SP30 Pin     |= Connected To  |= Notes |
+| 1 - 1Diag/Enable  | mbed p26       | Connect both motor enables together (Level Shift) |
+| 2 - 1INa          | mbed p29       | Left Motor (Level Shift) |
+| 3 - 1INb          | mbed p30       | Left Motor (Level Shift) |
+| 4 - 1PWM          | mbed p22       | Left Motor (Level Shift) |
+| 5 - 1CS           | Unconnected    | Current Sense Unsupported |
+| ----------------- | -------------- | |
+| 6 - VMOT          | Battery +      | Use terminals instead |
+| 7 - GND           | Battery -      | Use terminals instead |
+| 8 - 5V(IN)        | mbed Vin       | 5V |
+| 9 - GND           | Battery -      | Use terminals instead |
+| 10 - VMOT         | Battery +      | Use terminals instead |
+| ----------------- | -------------- | |
+| 11 - 2CS          | Unconnected    | Current Sense Unsupported |
+| 12 - 2PWM         | mbed p21       | Right Motor (Level Shift) |
+| 13 - 2INb         | mbed p19       | Right Motor (Level Shift) |
+| 14 - 2INa         | mbed p20       | Right Motor (Level Shift) |
+| 15 - 2Diag/Enable | mbed p26       | Connect both motor enables together (Level Shift) |
+
+===RC Receiver Channel Headers
+|= RC Channel Wire Color |= Name |
+| White                  | PWM Signal |
+| Red                    | +5V |
+| Black                  | Ground |
+
+===IMU Pin Usage
+|= MPU9150 Signal |= Connected To |
+| p1 - Gnd        | Ground |
+| p2 - VCC        | mbed Vout 3.3V |
+| p3 - SDA        | mbed p9 |
+| p4 - SCL        | mbed p10 |
+| p5 - p11        | Not Connected |
+
+===Level Shifting
+The new motor driver required 5V signaling so I had to add some FETs and pull-up resistors into the mix to step up the
+3.3V output signals from the LPC1768.  I used a level shifting mechanism based on
+[[https://github.com/adamgreen/bb-8/blob/master/docs/Sparkfun_Logic_Level_Bidirectional.pdf | this one from Sparkfun's converter boards]].
+It uses a surface mount NXP BSS138 N-channel MOSFET which required some tricky soldering to get them and some 0805
+surface mount 10k pull-up resistors connected to my board.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150927-03.jpg}}\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20150927-04.jpg}}\\
+I also had to make a modification to the Pololu VNH3SP30 board's PWM input path.  These inputs were pulled low with a
+10k ohm resistor which when combined with my 10k pull-up resistor resulted in a 2.5V **ON** voltage rather than the
+expected 5V.  I just removed these two surface mount resistors from the Pololu board since my added pull-up resistors
+accomplished a similar task while also facilitating the required step-up.
+
+
+
 ==September 17, 2015
 I received my [[http://www.sphero.com/starwars | Sphero BB-8 toy]] earlier this week.  Here are some photos of my new
 toy:\\
