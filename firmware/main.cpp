@@ -29,12 +29,15 @@
 // Set to 1 to disable PID loop and brake motors when radio is turned off.
 #define BRAKE_ON_RADIO_TIMEOUT 1
 
+// Enable RC control of motor velocity by setting to non-zero.
+#define RADIO_ENABLE 0
+
 // Default motor PWM period.
-#define PWM_PERIOD (1.0f / 20000.0f)
+#define PWM_PERIOD (1.0f / 10000.0f)
 
 // Maximum motor output PWM duty cycle.
 // Useful for limiting amount of power to motors during early testing.
-#define MAX_MOTOR_POWER 0.25f
+#define MAX_MOTOR_POWER 0.50f
 
 // Interval between PID updates (in seconds).
 #define PID_INTERVAL (1.0f / 100.0f)
@@ -78,8 +81,8 @@ struct TickInfo
 static MPU6050                      g_mpu(p9, p10);
 static PwmIn                        g_radioYaw(p17);
 static PwmIn                        g_radioPitch(p18);
-static PID                          g_rightPID(0.0056f, 0.03f, 0.0f, 0.35f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
-static PID                          g_leftPID(0.0056f, 0.03f, 0.0f, 0.35f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
+static PID                          g_rightPID(0.0059f, 0.04f, 0.0f, 0.30f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
+static PID                          g_leftPID(0.0059f, 0.04f, 0.0f, 0.30f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
 static Motor                        g_motors(p22, p29, p30, p21, p20, p19, p26, MAX_MOTOR_POWER, MAX_MOTOR_POWER, PWM_PERIOD);
 // Note: Encoders object should be constructed after any other objects using InterruptIn so that the interrupt
 //       handlers get chained together properly.
@@ -121,8 +124,6 @@ int main()
     }
 
     updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
-    g_leftPID.enableAutomaticMode();
-    g_rightPID.enableAutomaticMode();
 
     // UNDONE: I will need to completely replace this serial method of getting commands as it isn't compatible with
     //         MRI / GDB.
@@ -173,20 +174,23 @@ int main()
         }
         wasLoggingEnabled = g_enableLogging;
 
-        // Set forward / reverse velocity based on pitch channel of radio.
-        bool hasRadioTimedOut = g_radioPitch.hasTimedOut(RADIO_TIMEOUT);
-        float desiredVelocity = hasRadioTimedOut ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()) * 20.0f;
-        if (BRAKE_ON_RADIO_TIMEOUT && hasRadioTimedOut)
+        if (RADIO_ENABLE)
         {
-            g_leftPID.setOutputManually(0.0f);
-            g_rightPID.setOutputManually(0.0f);
-        }
-        else
-        {
-            g_leftPID.enableAutomaticMode();
-            g_rightPID.enableAutomaticMode();
-            g_leftPID.updateSetPoint(desiredVelocity);
-            g_rightPID.updateSetPoint(desiredVelocity);
+            // Set forward / reverse velocity based on pitch channel of radio.
+            bool hasRadioTimedOut = g_radioPitch.hasTimedOut(RADIO_TIMEOUT);
+            float desiredVelocity = hasRadioTimedOut ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()) * 32.0f;
+            if (BRAKE_ON_RADIO_TIMEOUT && hasRadioTimedOut)
+            {
+                g_leftPID.setOutputManually(0.0f);
+                g_rightPID.setOutputManually(0.0f);
+            }
+            else
+            {
+                g_leftPID.enableAutomaticMode();
+                g_rightPID.enableAutomaticMode();
+                g_leftPID.updateSetPoint(desiredVelocity);
+                g_rightPID.updateSetPoint(desiredVelocity);
+            }
         }
     }
 
