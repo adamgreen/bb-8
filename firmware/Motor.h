@@ -10,7 +10,9 @@
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 */
-/* Class used to interface with the TB6612FNG dual channel motor controller. */
+/* Class used to interface with the Pololu VNH3SP30 dual channel
+   motor controller.
+*/
 #ifndef MOTOR_H_
 #define MOTOR_H_
 
@@ -85,11 +87,11 @@ class Motor
 public:
     Motor(PinName channelAPwmPin, PinName channelAInput1Pin, PinName channelAInput2Pin,
           PinName channelBPwmPin, PinName channelBInput1Pin, PinName channelBInput2Pin,
-          PinName standbyPin,
+          PinName enablePin,
           float channelAMax = 1.0f, float channelBMax = 1.0f, float period = 1.0f / 10000.0f) :
         m_channelA(channelAPwmPin, channelAInput1Pin, channelAInput2Pin, channelAMax),
         m_channelB(channelBPwmPin, channelBInput1Pin, channelBInput2Pin, channelBMax),
-        m_standby(standbyPin)
+        m_enable(enablePin)
     {
         setPeriod(period);
         enable();
@@ -125,18 +127,18 @@ public:
 
     void enable()
     {
-        m_standby.write(1);
+        m_enable.write(1);
     }
 
     void disable()
     {
-        m_standby.write(0);
+        m_enable.write(0);
     }
 
 protected:
     MotorChannel m_channelA;
     MotorChannel m_channelB;
-    DigitalOut   m_standby;
+    DigitalOut   m_enable;
     float        m_period;
 };
 
