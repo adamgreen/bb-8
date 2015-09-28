@@ -82,7 +82,10 @@ public:
 
     void setOutputManually(float controlOutput)
     {
-        assert( controlOutput >= m_controlMin && controlOutput <= m_controlMax );
+        if (controlOutput < m_controlMin)
+            controlOutput = m_controlMin;
+        if (controlOutput > m_controlMax)
+            controlOutput = m_controlMax;
         m_isAuto = false;
         m_controlOutput = controlOutput;
     }
