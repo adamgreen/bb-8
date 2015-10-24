@@ -30,7 +30,7 @@
 #define BRAKE_ON_RADIO_TIMEOUT 1
 
 // Enable RC control of motor velocity by setting to non-zero.
-#define RADIO_ENABLE 0
+#define RADIO_ENABLE 1
 
 // Default motor PWM period.
 #define PWM_PERIOD (1.0f / 10000.0f)
@@ -57,6 +57,28 @@
 #ifndef M_PI
 const float M_PI = 3.14159265f;
 #endif
+
+// Which element in the IMU's ypr array represents our platform pitch.
+#define PITCH_ELEMENT 1
+
+// Should the IMU's pitch be inverted.  Want pitching the front of the platform up to be positive.
+#define PITCH_INVERT  true
+
+// How far to pitch the platform during calibration testing.
+#define PITCH_CALIBRATE_ANGLE (15.0f * (M_PI / 180.f))
+
+// PWM duty cycle to use when peforming the pitch calibration.
+#define PITCH_CALIBRATE_PWM 0.20f
+
+
+// Run modes for this program.
+enum ProgramModes
+{
+    // Default run mode
+    MODE_DEFAULT = 0,
+    // Used to oscillate the pitch to determine PID constants.
+    MODE_PITCH_CALIBRATE = 1
+} g_programMode = MODE_PITCH_CALIBRATE;
 
 struct TickInfo
 {
@@ -93,12 +115,18 @@ static bool                         g_enableLogging = false;
 static uint16_t                     g_packetSize = 0;
 static volatile uint32_t            g_overflowCount = 0;
 
-static float scalePwmDutyCycle(float dutyCycle);
+// Keep a log in the upper RAM banks of the LPC1768.
+static float*                       g_pLog;
+static __attribute((section("AHBSRAM0"),aligned)) uint8_t g_log1[16 * 1024];
+static __attribute((section("AHBSRAM1"),aligned)) uint8_t g_log2[16 * 1024];
+
+
 static void initInterruptPriorities();
 static int initIMU();
+static void updateMotorOutputs(float leftValue, float rightValue, float period);
 static void tickHandler();
 static void readLatestImuPacket(Quaternion* pQuaternion);
-static void updateMotorOutputs(float leftValue, float rightValue, float period);
+static int runDefaultMode();
 static void serialRxHandler(void);
 static void parseCommand(char* pCommand);
 static void parseManualCommand(char* pCommand);
@@ -107,6 +135,8 @@ static void skipWhitespace(char** ppCommand);
 static float parseOptionalPeriod(char* pCommand, float defaultVal);
 static void parseSetPointCommand(char* pCommand);
 static void displayHelp();
+static float scalePwmDutyCycle(float dutyCycle);
+static int runPitchCalibrateMode();
 
 
 int main()
@@ -125,13 +155,122 @@ int main()
 
     updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
 
+    ticker.attach(tickHandler, PID_INTERVAL);
+
+    switch (g_programMode)
+    {
+    case MODE_DEFAULT:
+        return runDefaultMode();
+    case MODE_PITCH_CALIBRATE:
+        return runPitchCalibrateMode();
+    }
+
+    return -1;
+}
+
+static void initInterruptPriorities()
+{
+    // Time critical GPIO interrupts are given highest priority.
+    // Getting data in from serial port is lowest priority.
+    NVIC_SetPriority(EINT3_IRQn, 1);
+    NVIC_SetPriority(TIMER3_IRQn, 2);
+    if (!MRI_ENABLE)
+        NVIC_SetPriority(UART0_IRQn, 3);
+}
+
+static int initIMU()
+{
+    g_mpu.initialize();
+
+    if (!g_mpu.testConnection())
+        printf("error: MPU6050 connection failed\r\n");
+
+    uint8_t devStatus = g_mpu.dmpInitialize();
+    if (devStatus != 0)
+    {
+        // How to interpret failure code:
+        //  1 = initial memory load failed
+        //  2 = DMP configuration updates failed.
+        // If it's going to break, usually the code will be 1.
+        printf("error: DMP Initialization failed (code %d)\n", devStatus);
+        return devStatus;
+    }
+
+    // Setting gyro bias to reduce drift.
+	g_mpu.setXGyroOffsetTC(7);
+	g_mpu.setYGyroOffsetTC(-4);
+	g_mpu.setZGyroOffsetTC(11);
+
+    g_mpu.setDMPEnabled(true);
+
+    // Clear any already pending interrupt bits.
+    g_mpu.getIntStatus();
+
+    // Get expected DMP packet size for later comparison.
+    g_packetSize = g_mpu.dmpGetFIFOPacketSize();
+
+    return 0;
+}
+
+static void updateMotorOutputs(float leftValue, float rightValue, float period)
+{
+    g_motors.setPeriod(period);
+    g_leftPID.setOutputManually(leftValue);
+    g_rightPID.setOutputManually(rightValue);
+
+    printf("Manual PWM Mode - PWM frequency = %f\n", 1.0f / period);
+}
+
+static void tickHandler()
+{
+    EncoderCounts encoderCounts = g_encoders.getAndClearEncoderCounts();
+    g_motors.set(g_leftPID.compute(encoderCounts.encoder1Count), g_rightPID.compute(encoderCounts.encoder2Count));
+
+    g_tick.counts.encoder1Count = encoderCounts.encoder1Count;
+    g_tick.counts.encoder2Count = encoderCounts.encoder2Count;
+    g_tick.leftPWM = g_leftPID.getControlOutput();
+    g_tick.rightPWM = g_rightPID.getControlOutput();
+    g_tick.leftSetPoint = g_leftPID.getSetPoint();
+    g_tick.rightSetPoint = g_rightPID.getSetPoint();
+    readLatestImuPacket(&g_tick.quaternion);
+    g_tick.time++;
+}
+
+static void readLatestImuPacket(Quaternion* pQuaternion)
+{
+    uint8_t  fifoBuffer[64];
+
+    uint8_t g_mpuIntStatus = g_mpu.getIntStatus();
+    uint16_t fifoCount = g_mpu.getFIFOCount();
+    if ((g_mpuIntStatus & 0x10) || fifoCount == 1024)
+    {
+        // Hit FIFO overflow.
+        g_overflowCount++;
+        g_mpu.resetFIFO();
+        return;
+    }
+
+    // Read all available IMU packets.  We only care about the latest one.
+    while (fifoCount >= g_packetSize)
+    {
+        g_mpu.getFIFOBytes(fifoBuffer, g_packetSize);
+
+        // Track FIFO count here in case there is > 1 packet available.
+        fifoCount -= g_packetSize;
+
+        // Parse out the g_latestQuaternionuaternion into global variable.
+        g_mpu.dmpGetQuaternion(pQuaternion, fifoBuffer);
+    }
+}
+
+static int runDefaultMode()
+{
     // UNDONE: I will need to completely replace this serial method of getting commands as it isn't compatible with
     //         MRI / GDB.
     g_serial.attach(serialRxHandler);
 
     bool wasLoggingEnabled = false;
     uint32_t lastTick = g_tick.time;
-    ticker.attach(tickHandler, PID_INTERVAL);
 
     for (;;)
     {
@@ -195,122 +334,6 @@ int main()
     }
 
     return 0;
-}
-
-static float scalePwmDutyCycle(float dutyCycle)
-{
-    if (PWM_DUTY_CYCLE_MIN != 0.0f && PWM_DUTY_CYCLE_MAX != 0.0f)
-    {
-        static const float min = PWM_DUTY_CYCLE_MIN;
-        static const float max = PWM_DUTY_CYCLE_MAX;
-        static const float center = (min + max) / 2.0f;
-
-        float scaledResult = (dutyCycle - center) * 2.0f / (max - min);
-        if (scaledResult < -1.0f)
-            scaledResult = -1.0f;
-        else if (scaledResult > 1.0f)
-            scaledResult = 1.0f;
-        return scaledResult;
-    }
-    else
-    {
-        return dutyCycle;
-    }
-}
-
-static void initInterruptPriorities()
-{
-    // Time critical GPIO interrupts are given highest priority.
-    // Getting data in from serial port is lowest priority.
-    NVIC_SetPriority(EINT3_IRQn, 1);
-    NVIC_SetPriority(TIMER3_IRQn, 2);
-    if (!MRI_ENABLE)
-        NVIC_SetPriority(UART0_IRQn, 3);
-}
-
-static int initIMU()
-{
-    g_mpu.initialize();
-
-    if (!g_mpu.testConnection())
-        printf("error: MPU6050 connection failed\r\n");
-
-    uint8_t devStatus = g_mpu.dmpInitialize();
-    if (devStatus != 0)
-    {
-        // How to interpret failure code:
-        //  1 = initial memory load failed
-        //  2 = DMP configuration updates failed.
-        // If it's going to break, usually the code will be 1.
-        printf("error: DMP Initialization failed (code %d)\n", devStatus);
-        return devStatus;
-    }
-
-    // Setting gyro bias to reduce drift.
-	g_mpu.setXGyroOffsetTC(7);
-	g_mpu.setYGyroOffsetTC(-4);
-	g_mpu.setZGyroOffsetTC(11);
-
-    g_mpu.setDMPEnabled(true);
-
-    // Clear any already pending interrupt bits.
-    g_mpu.getIntStatus();
-
-    // Get expected DMP packet size for later comparison.
-    g_packetSize = g_mpu.dmpGetFIFOPacketSize();
-
-    return 0;
-}
-
-static void tickHandler()
-{
-    EncoderCounts encoderCounts = g_encoders.getAndClearEncoderCounts();
-    g_motors.set(g_leftPID.compute(encoderCounts.encoder1Count), g_rightPID.compute(encoderCounts.encoder2Count));
-
-    g_tick.counts.encoder1Count = encoderCounts.encoder1Count;
-    g_tick.counts.encoder2Count = encoderCounts.encoder2Count;
-    g_tick.leftPWM = g_leftPID.getControlOutput();
-    g_tick.rightPWM = g_rightPID.getControlOutput();
-    g_tick.leftSetPoint = g_leftPID.getSetPoint();
-    g_tick.rightSetPoint = g_rightPID.getSetPoint();
-    readLatestImuPacket(&g_tick.quaternion);
-    g_tick.time++;
-}
-
-static void readLatestImuPacket(Quaternion* pQuaternion)
-{
-    uint8_t  fifoBuffer[64];
-
-    uint8_t g_mpuIntStatus = g_mpu.getIntStatus();
-    uint16_t fifoCount = g_mpu.getFIFOCount();
-    if ((g_mpuIntStatus & 0x10) || fifoCount == 1024)
-    {
-        // Hit FIFO overflow.
-        g_overflowCount++;
-        g_mpu.resetFIFO();
-        return;
-    }
-
-    // Read all available IMU packets.  We only care about the latest one.
-    while (fifoCount >= g_packetSize)
-    {
-        g_mpu.getFIFOBytes(fifoBuffer, g_packetSize);
-
-        // Track FIFO count here in case there is > 1 packet available.
-        fifoCount -= g_packetSize;
-
-        // Parse out the g_latestQuaternionuaternion into global variable.
-        g_mpu.dmpGetQuaternion(pQuaternion, fifoBuffer);
-    }
-}
-
-static void updateMotorOutputs(float leftValue, float rightValue, float period)
-{
-    g_motors.setPeriod(period);
-    g_leftPID.setOutputManually(leftValue);
-    g_rightPID.setOutputManually(rightValue);
-
-    printf("Manual PWM Mode - PWM frequency = %f\n", 1.0f / period);
 }
 
 static void serialRxHandler(void)
@@ -453,4 +476,136 @@ static void displayHelp()
            "      toggle logging on/off: l\n"
            "toggle automatic PID on/off: a\n"
            "           update set point: s leftRate rightRate\n");
+}
+
+static float scalePwmDutyCycle(float dutyCycle)
+{
+    if (PWM_DUTY_CYCLE_MIN != 0.0f && PWM_DUTY_CYCLE_MAX != 0.0f)
+    {
+        static const float min = PWM_DUTY_CYCLE_MIN;
+        static const float max = PWM_DUTY_CYCLE_MAX;
+        static const float center = (min + max) / 2.0f;
+
+        float scaledResult = (dutyCycle - center) * 2.0f / (max - min);
+        if (scaledResult < -1.0f)
+            scaledResult = -1.0f;
+        else if (scaledResult > 1.0f)
+            scaledResult = 1.0f;
+        return scaledResult;
+    }
+    else
+    {
+        return dutyCycle;
+    }
+}
+
+static int runPitchCalibrateMode()
+{
+    static const float* pLogEnd = (float*)(g_log2 + sizeof(g_log2));
+    DigitalOut          led1(LED1);
+    LocalFileSystem     local("local");
+    uint32_t            lastTick = g_tick.time;
+    float               pitchPwm = PITCH_CALIBRATE_PWM;
+    enum
+    {
+        PITCH_FORWARD = 0,
+        PITCH_BACKWARD = 1
+    } pitchMode = PITCH_FORWARD;
+
+
+    printf("Pitch Calibration\n");
+    for (;;)
+    {
+        // Make sure that the remote control is turned off and only start test once it has been turned on again.
+        printf("Waiting for remote control to be turned OFF...\n");
+        while (!g_radioPitch.hasTimedOut(RADIO_TIMEOUT))
+        {
+            // Blink LED FASTER to let user know that we are waiting for them to turn radio OFF.
+            led1 = !led1;
+            wait_ms(250);
+        }
+
+        // Wait for remote control to be turned back on to start the test.
+        printf("Waiting for remote control to be turned ON...\n");
+        while (g_radioPitch.hasTimedOut(RADIO_TIMEOUT))
+        {
+            // Blink LED SLOWER to let user know that we are waiting for them to turn radio ON.
+            led1 = !led1;
+            wait_ms(500);
+        }
+        led1 = 0;
+
+        // Run the calibration test now by oscillating back and forth and recording the resulting data.
+        printf("Running pitch calibration test...\n\n");
+        printf("time,leftPWM,leftEncoder,yaw,pitch,roll\n");
+        g_pLog = (float*)&g_log1[0];
+        for (;;)
+        {
+            // Wait for next tick update interrupt to be handled.
+            while (lastTick == g_tick.time)
+            {
+            }
+            lastTick = g_tick.time;
+
+            VectorFloat gravity;
+            float       ypr[3];
+            g_mpu.dmpGetGravity(&gravity, &g_tick.quaternion);
+            ypr[0] = atan2f(gravity.y, gravity.z);
+            ypr[1] = atan2f(gravity.x, gravity.z);
+            ypr[2] = atan2f(gravity.x, gravity.y);
+
+            float pitchAngle = ypr[PITCH_ELEMENT];
+            if (PITCH_INVERT)
+                pitchAngle = -pitchAngle;
+
+            printf("%lu,%.2f,%ld,%.2f\n",
+                   g_tick.time,
+                   g_tick.leftPWM, g_tick.counts.encoder1Count,
+                   pitchAngle * 180.0f/M_PI);
+
+            // Keep logging data until we run out of RAM to store it all.
+            *g_pLog++ = g_tick.leftPWM;
+            *g_pLog++ = pitchAngle;
+            if (g_pLog >= pLogEnd || g_radioPitch.hasTimedOut(RADIO_TIMEOUT))
+                break;
+
+            switch (pitchMode)
+            {
+            case PITCH_FORWARD:
+                if (pitchAngle > PITCH_CALIBRATE_ANGLE)
+                {
+                    pitchPwm = -PITCH_CALIBRATE_PWM;
+                    pitchMode = PITCH_BACKWARD;
+                }
+                break;
+            case PITCH_BACKWARD:
+                if (pitchAngle < -PITCH_CALIBRATE_ANGLE)
+                {
+                    pitchPwm = PITCH_CALIBRATE_PWM;
+                    pitchMode = PITCH_FORWARD;
+                }
+                break;
+            }
+
+            g_leftPID.setOutputManually(pitchPwm);
+        }
+
+        // Get here once the log has been filled.
+        g_leftPID.setOutputManually(0);
+        FILE* pFile = fopen("/local/pitch.csv", "w");
+        if (pFile)
+        {
+            float* pCurr = (float*)g_log1;
+
+            fprintf(pFile, "pwm,pitch\n");
+            while (pCurr < g_pLog)
+            {
+                fprintf(pFile, "%.2f,%.4f\n", pCurr[0], pCurr[1]);
+                pCurr += 2;
+            }
+            fclose(pFile);
+        }
+    }
+
+    return 0;
 }
