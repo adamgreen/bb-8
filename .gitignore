@@ -7,3 +7,7 @@
 *.map
 *.o
 *.d
+*.log
+mriprog/generated/
+mriprog/bin2h
+mriprog/mriprog
