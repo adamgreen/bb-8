@@ -1,0 +1,2 @@
+#! /usr/bin/env bash
+arm-none-eabi-gdb -ex "set target-charset ASCII" -ex "set print pretty on" -ex "set remotelogfile mri.log" -ex "target remote 192.168.0.129:23" LPC1768/*.elf

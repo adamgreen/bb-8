@@ -22,6 +22,7 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "PID.h"
 #include "PwmIn.h"
+#include "RamLog.h"
 
 // Set to 1 to have serial data echoed back to terminal.
 #define SERIAL_ECHO 0
@@ -40,7 +41,7 @@
 #define MAX_MOTOR_POWER 0.50f
 
 // Interval between PID updates (in seconds).
-#define PID_INTERVAL (1.0f / 100.0f)
+#define PID_INTERVAL (1.0f / 200.0f)
 
 // Set to non-zero if you want to see raw gyro readings dumped to get a feel for drift.
 #define DUMP_GYRO_RATINGS 0
@@ -52,7 +53,7 @@
 
 // The radio should send a pulse 50 times a second so if we go 1/25th of a second without receiving 1 then flag as a
 // time out.
-#define RADIO_TIMEOUT (1000000 / 25)
+#define RADIO_TIMEOUT (2 * (1000000 / 25))
 
 #ifndef M_PI
 const float M_PI = 3.14159265f;
@@ -78,33 +79,27 @@ enum ProgramModes
     MODE_DEFAULT = 0,
     // Used to oscillate the pitch to determine PID constants.
     MODE_PITCH_CALIBRATE = 1
-} g_programMode = MODE_PITCH_CALIBRATE;
+} g_programMode = MODE_DEFAULT;
 
 struct TickInfo
 {
     volatile uint32_t   time;
     EncoderCounts       counts;
-    float               leftPWM;
-    float               rightPWM;
-    float               leftSetPoint;
-    float               rightSetPoint;
+    float               pitchPWM;
+    float               rollPWM;
+    float               pitchSetPoint;
+    float               rollSetPoint;
+    float               pitchCurrent;
+    float               rollCurrent;
     Quaternion          quaternion;
 };
 
-// MRI will take care of initializing the UART if has been linked into the program.
-// UNDONE: I am planning to move MRI to it's own UART in the future.
-#if !MRI_ENABLE
-    static Serial g_serial(USBTX, USBRX);
-    #define INIT_SERIAL_BAUD(BAUD) g_serial.baud(BAUD)
-#else
-    #define INIT_SERIAL_BAUD(BAUD) (void)0
-#endif // !MRI_ENABLE
-
+static Serial                       g_serial(USBTX, USBRX);
 static MPU6050                      g_mpu(p9, p10);
-static PwmIn                        g_radioYaw(p17);
-static PwmIn                        g_radioPitch(p18);
-static PID                          g_rightPID(0.0059f, 0.04f, 0.0f, 0.30f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
-static PID                          g_leftPID(0.0059f, 0.04f, 0.0f, 0.30f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
+static PwmIn                        g_radioYaw(p17, RADIO_TIMEOUT);
+static PwmIn                        g_radioPitch(p18, RADIO_TIMEOUT);
+static PID                          g_rollPID(0.0059f, 0.04f, 0.0f, 0.30f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
+static PID                          g_pitchPID(1.0f, 0.0f, 0.0f, 0.0f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
 static Motor                        g_motors(p22, p29, p30, p21, p20, p19, p26, MAX_MOTOR_POWER, MAX_MOTOR_POWER, PWM_PERIOD);
 // Note: Encoders object should be constructed after any other objects using InterruptIn so that the interrupt
 //       handlers get chained together properly.
@@ -119,11 +114,12 @@ static volatile uint32_t            g_overflowCount = 0;
 static float*                       g_pLog;
 static __attribute((section("AHBSRAM0"),aligned)) uint8_t g_log1[16 * 1024];
 static __attribute((section("AHBSRAM1"),aligned)) uint8_t g_log2[16 * 1024];
+static LocalFileSystem              g_local("local");
 
 
 static void initInterruptPriorities();
 static int initIMU();
-static void updateMotorOutputs(float leftValue, float rightValue, float period);
+static void updateMotorOutputs(float pitchValue, float rollValue, float period);
 static void tickHandler();
 static void readLatestImuPacket(Quaternion* pQuaternion);
 static int runDefaultMode();
@@ -143,7 +139,7 @@ int main()
 {
     Ticker ticker;
 
-    INIT_SERIAL_BAUD(230400);
+    g_serial.baud(230400);
     initInterruptPriorities();
 
     int imuStatus = initIMU();
@@ -172,10 +168,10 @@ static void initInterruptPriorities()
 {
     // Time critical GPIO interrupts are given highest priority.
     // Getting data in from serial port is lowest priority.
+    // Reserve highest priority (level 0) for MRI remote debugging.
     NVIC_SetPriority(EINT3_IRQn, 1);
     NVIC_SetPriority(TIMER3_IRQn, 2);
-    if (!MRI_ENABLE)
-        NVIC_SetPriority(UART0_IRQn, 3);
+    NVIC_SetPriority(UART0_IRQn, 3);
 }
 
 static int initIMU()
@@ -212,27 +208,23 @@ static int initIMU()
     return 0;
 }
 
-static void updateMotorOutputs(float leftValue, float rightValue, float period)
+static void updateMotorOutputs(float pitchValue, float rollValue, float period)
 {
     g_motors.setPeriod(period);
-    g_leftPID.setOutputManually(leftValue);
-    g_rightPID.setOutputManually(rightValue);
+    g_pitchPID.setOutputManually(pitchValue);
+    g_rollPID.setOutputManually(rollValue);
 
-    printf("Manual PWM Mode - PWM frequency = %f\n", 1.0f / period);
+    g_serial.printf("Manual PWM Mode - PWM frequency = %f\n", 1.0f / period);
 }
 
 static void tickHandler()
 {
     EncoderCounts encoderCounts = g_encoders.getAndClearEncoderCounts();
-    g_motors.set(g_leftPID.compute(encoderCounts.encoder1Count), g_rightPID.compute(encoderCounts.encoder2Count));
+    g_motors.set(g_tick.pitchPWM, g_tick.rollPWM);
+    readLatestImuPacket(&g_tick.quaternion);
 
     g_tick.counts.encoder1Count = encoderCounts.encoder1Count;
     g_tick.counts.encoder2Count = encoderCounts.encoder2Count;
-    g_tick.leftPWM = g_leftPID.getControlOutput();
-    g_tick.rightPWM = g_rightPID.getControlOutput();
-    g_tick.leftSetPoint = g_leftPID.getSetPoint();
-    g_tick.rightSetPoint = g_rightPID.getSetPoint();
-    readLatestImuPacket(&g_tick.quaternion);
     g_tick.time++;
 }
 
@@ -265,12 +257,22 @@ static void readLatestImuPacket(Quaternion* pQuaternion)
 
 static int runDefaultMode()
 {
-    // UNDONE: I will need to completely replace this serial method of getting commands as it isn't compatible with
-    //         MRI / GDB.
     g_serial.attach(serialRxHandler);
 
     bool wasLoggingEnabled = false;
     uint32_t lastTick = g_tick.time;
+    TickInfo tick;
+
+    // Initialize the logger to beginning of RAM buffer.
+    struct
+    {
+        uint32_t time;
+        float    setPoint;
+        float    pwm;
+        float    imu;
+    } logEntry;
+    CircularRamLogger logger((void*)g_log1, sizeof(g_log1) + sizeof(g_log2), sizeof(logEntry));
+    bool wasRadioOn = false;
 
     for (;;)
     {
@@ -278,57 +280,127 @@ static int runDefaultMode()
         while (lastTick == g_tick.time)
         {
         }
-        lastTick = g_tick.time;
+        tick = g_tick;
+        lastTick = tick.time;
+
+        VectorFloat gravity;
+        float       ypr[3];
+        g_mpu.dmpGetGravity(&gravity, &tick.quaternion);
+        ypr[0] = atan2f(gravity.y, gravity.z);
+        ypr[1] = atan2f(gravity.x, gravity.z);
+        ypr[2] = atan2f(gravity.x, gravity.y);
+        g_tick.pitchCurrent = PITCH_INVERT ? -ypr[PITCH_ELEMENT] : ypr[PITCH_ELEMENT];
+        // UNDONE: Need to handle like pitch above.
+        g_tick.rollCurrent = 0.0f;
+
+        g_tick.pitchSetPoint = g_pitchPID.getSetPoint();
+        g_tick.rollSetPoint = g_rollPID.getSetPoint();
+        g_tick.pitchPWM = g_pitchPID.compute(g_tick.pitchCurrent);
+        g_tick.rollPWM = g_rollPID.compute(g_tick.rollCurrent);
 
         if (g_enableLogging)
         {
             if (!wasLoggingEnabled && g_enableLogging)
             {
                 // Just turned logging on so dump column headings.
-                printf("time,leftPWM,leftSetPoint,leftEncoder,rightPWM,rightSetPoint,rightEncoder,"
-                       "yaw,pitch,roll,radioYaw,radioPitch\n");
+                g_serial.printf("time,pitchPWM,pitchSetPoint,pitchEncoder,rollPWM,rollSetPoint,rollEncoder,"
+                                "yaw,pitch,roll,radioYaw,radioPitch\n");
             }
 
-            VectorFloat gravity;
-            float       ypr[3];
-            g_mpu.dmpGetGravity(&gravity, &g_tick.quaternion);
-            g_mpu.dmpGetYawPitchRoll(ypr, &g_tick.quaternion, &gravity);
-            printf("%lu,%.2f,%.2f,%ld,%.2f,%.2f,%ld,%.2f,%.2f,%.2f,%.2f,%.2f\n",
-                   g_tick.time,
-                   g_tick.leftPWM, g_tick.leftSetPoint, g_tick.counts.encoder1Count,
-                   g_tick.rightPWM, g_tick.rightSetPoint, g_tick.counts.encoder2Count,
-                   ypr[0] * 180.0f/M_PI,
-                   ypr[1] * 180.0f/M_PI,
-                   ypr[2] * 180.0f/M_PI,
-                   g_radioYaw.hasTimedOut(RADIO_TIMEOUT) ? 0.0f : scalePwmDutyCycle(g_radioYaw.getDutyCycle()),
-                   g_radioPitch.hasTimedOut(RADIO_TIMEOUT) ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()));
+            g_serial.printf("%lu,%.2f,%.2f,%ld,%.2f,%.2f,%ld,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+                           tick.time,
+                           tick.pitchPWM, tick.pitchSetPoint, tick.counts.encoder1Count,
+                           tick.rollPWM, tick.rollSetPoint, tick.counts.encoder2Count,
+                           ypr[0] * 180.0f/M_PI,
+                           ypr[1] * 180.0f/M_PI,
+                           ypr[2] * 180.0f/M_PI,
+                           g_radioYaw.hasTimedOut() ? 0.0f : scalePwmDutyCycle(g_radioYaw.getDutyCycle()),
+                           g_radioPitch.hasTimedOut() ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()));
 
             // Can be useful to dump gyro values to determine drift.
             if (DUMP_GYRO_RATINGS)
             {
                 int16_t gyrox, gyroy, gyroz;
                 g_mpu.getRotation(&gyrox, &gyroy, &gyroz);
-                printf("%d,%d,%d\n", gyrox, gyroy, gyroz);
+                g_serial.printf("%d,%d,%d\n", gyrox, gyroy, gyroz);
             }
         }
         wasLoggingEnabled = g_enableLogging;
 
         if (RADIO_ENABLE)
         {
-            // Set forward / reverse velocity based on pitch channel of radio.
-            bool hasRadioTimedOut = g_radioPitch.hasTimedOut(RADIO_TIMEOUT);
-            float desiredVelocity = hasRadioTimedOut ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()) * 32.0f;
+            // Set platform pitch angle based on pitch channel of radio.
+            bool hasRadioTimedOut = g_radioPitch.hasTimedOut();
+            float desiredPitch = hasRadioTimedOut ? 0.0f : scalePwmDutyCycle(g_radioPitch.getDutyCycle()) * (M_PI / 4.0f);
+            float desiredRoll = 0.0f;
             if (BRAKE_ON_RADIO_TIMEOUT && hasRadioTimedOut)
             {
-                g_leftPID.setOutputManually(0.0f);
-                g_rightPID.setOutputManually(0.0f);
+                g_pitchPID.setOutputManually(0.0f);
+                g_rollPID.setOutputManually(0.0f);
+                g_tick.pitchPWM = 0.0f;
+                g_tick.rollPWM = 0.0f;
             }
             else
             {
-                g_leftPID.enableAutomaticMode();
-                g_rightPID.enableAutomaticMode();
-                g_leftPID.updateSetPoint(desiredVelocity);
-                g_rightPID.updateSetPoint(desiredVelocity);
+                g_pitchPID.enableAutomaticMode();
+                g_rollPID.enableAutomaticMode();
+                g_pitchPID.updateSetPoint(desiredPitch);
+                g_rollPID.updateSetPoint(desiredRoll);
+            }
+
+            // Handle logging to circular buffer when the radio is on and then dump to LocalFileSystem when the radio
+            // is switched off.
+            if (wasRadioOn && hasRadioTimedOut)
+            {
+                wasRadioOn = false;
+
+                // The radio was just switched off so copy latest entries to LocalFileSystem.
+                printf("CSV dump starting...\n");
+                wait_ms(250);
+                FILE* pFile = fopen("/local/pid.csv", "w");
+                if (pFile)
+                {
+                    fprintf(pFile, "time,pitchSetPoint,pitchPwm,pitchImu\n");
+                    if (logger.findOldestEntry(&logEntry, sizeof(logEntry)))
+                    {
+                        do
+                        {
+                            if (logEntry.time == 0 &&
+                                logEntry.setPoint == 0.0f &&
+                                logEntry.pwm == 0.0f &&
+                                logEntry.imu == 0.0f)
+                            {
+                                // This is an empty entry so ignore it.
+                                continue;
+                            }
+
+                            fprintf(pFile, "%lu,%.4f,%.4f,%.8f\n",
+                                           logEntry.time,
+                                           logEntry.setPoint,
+                                           logEntry.pwm,
+                                           logEntry.imu);
+                        } while (logger.findNextEntry(&logEntry, sizeof(logEntry)));
+                    }
+                    fclose(pFile);
+                }
+                printf("CSV dump completed.\n");
+            }
+            else if (!wasRadioOn && !hasRadioTimedOut)
+            {
+                // The radio was just switched on so reset the log.
+                logger.start();
+                wasRadioOn = true;
+            }
+
+            if (!hasRadioTimedOut)
+            {
+                // Log latest entry to circular RAM log while radio is turned on.
+                logEntry.time = tick.time;
+                logEntry.setPoint = tick.pitchSetPoint;
+                logEntry.pwm = tick.pitchPWM;
+                logEntry.imu = tick.pitchCurrent;
+
+                logger.logEntry(&logEntry, sizeof(logEntry));
             }
         }
     }
@@ -369,9 +441,9 @@ static void parseCommand(char* pCommand)
     switch (tolower(cmd))
     {
     case 'a':
-        printf("Enabling PID automatic mode\n");
-        g_leftPID.enableAutomaticMode();
-        g_rightPID.enableAutomaticMode();
+        g_serial.printf("Enabling PID automatic mode\n");
+        g_pitchPID.enableAutomaticMode();
+        g_rollPID.enableAutomaticMode();
         break;
     case 'l':
         g_enableLogging = !g_enableLogging;
@@ -400,18 +472,18 @@ static void parseCommand(char* pCommand)
 
 static void parseManualCommand(char* pCommand)
 {
-    float rightPWM = 0.0f;
-    float leftPWM = 0.0f;
+    float rollPWM = 0.0f;
+    float pitchPWM = 0.0f;
 
-    leftPWM = parseFloatValue(&pCommand) / 100.0f;
+    pitchPWM = parseFloatValue(&pCommand) / 100.0f;
     skipWhitespace(&pCommand);
-    rightPWM = parseFloatValue(&pCommand) / 100.0f;
+    rollPWM = parseFloatValue(&pCommand) / 100.0f;
     skipWhitespace(&pCommand);
     float period = parseOptionalPeriod(pCommand, g_motors.getPeriod());
 
     if (!g_badInput)
     {
-        updateMotorOutputs(leftPWM, rightPWM, period);
+        updateMotorOutputs(pitchPWM, rollPWM, period);
     }
 }
 
@@ -454,28 +526,28 @@ static float parseOptionalPeriod(char* pCommand, float defaultVal)
 
 static void parseSetPointCommand(char* pCommand)
 {
-    float left = 0.0f;
-    float right = 0.0f;
+    float pitch = 0.0f;
+    float roll = 0.0f;
 
-    left = parseFloatValue(&pCommand);
+    pitch = parseFloatValue(&pCommand);
     skipWhitespace(&pCommand);
-    right = parseFloatValue(&pCommand);
+    roll = parseFloatValue(&pCommand);
 
     if (!g_badInput)
     {
-        printf("Update SetPoint\n");
-        g_leftPID.updateSetPoint(left);
-        g_rightPID.updateSetPoint(right);
+        g_serial.printf("Update SetPoint\n");
+        g_pitchPID.updateSetPoint(pitch);
+        g_rollPID.updateSetPoint(roll);
     }
 }
 
 static void displayHelp()
 {
-    printf("Help\n"
-           "       manual motor setting: m leftPWM rightPWM (period)\n"
-           "      toggle logging on/off: l\n"
-           "toggle automatic PID on/off: a\n"
-           "           update set point: s leftRate rightRate\n");
+    g_serial.printf("Help\n"
+                    "       manual motor setting: m pitchPWM rollPWM (period)\n"
+                    "      toggle logging on/off: l\n"
+                    "toggle automatic PID on/off: a\n"
+                    "           update set point: s pitchRate rollRate\n");
 }
 
 static float scalePwmDutyCycle(float dutyCycle)
@@ -503,7 +575,6 @@ static int runPitchCalibrateMode()
 {
     static const float* pLogEnd = (float*)(g_log2 + sizeof(g_log2));
     DigitalOut          led1(LED1);
-    LocalFileSystem     local("local");
     uint32_t            lastTick = g_tick.time;
     float               pitchPwm = PITCH_CALIBRATE_PWM;
     enum
@@ -511,14 +582,15 @@ static int runPitchCalibrateMode()
         PITCH_FORWARD = 0,
         PITCH_BACKWARD = 1
     } pitchMode = PITCH_FORWARD;
+    TickInfo            tick;
 
 
-    printf("Pitch Calibration\n");
+    g_serial.printf("Pitch Calibration\n");
     for (;;)
     {
         // Make sure that the remote control is turned off and only start test once it has been turned on again.
-        printf("Waiting for remote control to be turned OFF...\n");
-        while (!g_radioPitch.hasTimedOut(RADIO_TIMEOUT))
+        g_serial.printf("Waiting for remote control to be turned OFF...\n");
+        while (!g_radioPitch.hasTimedOut())
         {
             // Blink LED FASTER to let user know that we are waiting for them to turn radio OFF.
             led1 = !led1;
@@ -526,8 +598,8 @@ static int runPitchCalibrateMode()
         }
 
         // Wait for remote control to be turned back on to start the test.
-        printf("Waiting for remote control to be turned ON...\n");
-        while (g_radioPitch.hasTimedOut(RADIO_TIMEOUT))
+        g_serial.printf("Waiting for remote control to be turned ON...\n");
+        while (g_radioPitch.hasTimedOut())
         {
             // Blink LED SLOWER to let user know that we are waiting for them to turn radio ON.
             led1 = !led1;
@@ -536,8 +608,8 @@ static int runPitchCalibrateMode()
         led1 = 0;
 
         // Run the calibration test now by oscillating back and forth and recording the resulting data.
-        printf("Running pitch calibration test...\n\n");
-        printf("time,leftPWM,leftEncoder,yaw,pitch,roll\n");
+        g_serial.printf("Running pitch calibration test...\n\n");
+        g_serial.printf("time,pitchPWM,pitchEncoder,yaw,pitch,roll\n");
         g_pLog = (float*)&g_log1[0];
         for (;;)
         {
@@ -545,11 +617,12 @@ static int runPitchCalibrateMode()
             while (lastTick == g_tick.time)
             {
             }
-            lastTick = g_tick.time;
+            tick = g_tick;
+            lastTick = tick.time;
 
             VectorFloat gravity;
             float       ypr[3];
-            g_mpu.dmpGetGravity(&gravity, &g_tick.quaternion);
+            g_mpu.dmpGetGravity(&gravity, &tick.quaternion);
             ypr[0] = atan2f(gravity.y, gravity.z);
             ypr[1] = atan2f(gravity.x, gravity.z);
             ypr[2] = atan2f(gravity.x, gravity.y);
@@ -558,15 +631,15 @@ static int runPitchCalibrateMode()
             if (PITCH_INVERT)
                 pitchAngle = -pitchAngle;
 
-            printf("%lu,%.2f,%ld,%.2f\n",
-                   g_tick.time,
-                   g_tick.leftPWM, g_tick.counts.encoder1Count,
+            g_serial.printf("%lu,%.2f,%ld,%.2f\n",
+                   tick.time,
+                   tick.pitchPWM, tick.counts.encoder1Count,
                    pitchAngle * 180.0f/M_PI);
 
             // Keep logging data until we run out of RAM to store it all.
-            *g_pLog++ = g_tick.leftPWM;
+            *g_pLog++ = tick.pitchPWM;
             *g_pLog++ = pitchAngle;
-            if (g_pLog >= pLogEnd || g_radioPitch.hasTimedOut(RADIO_TIMEOUT))
+            if (g_pLog >= pLogEnd || g_radioPitch.hasTimedOut())
                 break;
 
             switch (pitchMode)
@@ -579,7 +652,7 @@ static int runPitchCalibrateMode()
                 }
                 break;
             case PITCH_BACKWARD:
-                if (pitchAngle < -PITCH_CALIBRATE_ANGLE)
+                if (pitchAngle < PITCH_CALIBRATE_ANGLE)
                 {
                     pitchPwm = PITCH_CALIBRATE_PWM;
                     pitchMode = PITCH_FORWARD;
@@ -587,11 +660,14 @@ static int runPitchCalibrateMode()
                 break;
             }
 
-            g_leftPID.setOutputManually(pitchPwm);
+            g_pitchPID.setOutputManually(pitchPwm);
         }
 
         // Get here once the log has been filled.
-        g_leftPID.setOutputManually(0);
+        g_pitchPID.setOutputManually(0.0f);
+        g_tick.pitchPWM = 0.0f;
+        wait_ms(250);
+        printf("CSV dump starting...\n");
         FILE* pFile = fopen("/local/pitch.csv", "w");
         if (pFile)
         {
@@ -605,6 +681,7 @@ static int runPitchCalibrateMode()
             }
             fclose(pFile);
         }
+        printf("CSV dump completed...\n");
     }
 
     return 0;
