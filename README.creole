@@ -30,6 +30,127 @@ Above image from
 [[https://github.com/adamgreen/bb-8#clone-this-repo-and-its-submodules | How to Clone this GitHub Repository]]\\
 [[http://www.controlguru.com | Control Guru PID Notes]]\\
 [[http://brettbeauregard.com/blog/2011/04/improving-the-beginners-pid-introduction/ | Brett Beauregard's PID Notes]]\\
+[[http://brettbeauregard.com/blog/2012/01/arduino-pid-autotune-library/ | Brett Beauregard's Relay Method Tuning Notes]]\\
+[[http://neilkolban.com/tech/esp8266/ | Neil Kolban's ESP8266 Documentation]]\\
+[[https://github.com/jeelabs/esp-link | JEELABS' esp-Link firmware]]\\
+
+
+
+==November 6, 2015
+It's been awhile since I logged anything here but I have been making some good progress on building my 10" BB-8
+prototype.  The latest plan for my BB-8 replica no longer follows the Sphero model but those of ball bots
+[[http://www.instructables.com/id/Remote-Controlled-Basket-Ball-Robot/ | like this one]] that I used to see local robot
+builders making 15 years ago.  I currently have a platform built out of foam board spinning around inside of a hamster
+ball.  It only contains one motor at this point in time and that motor is used to change the pitch of the platform.
+Pitching the platform allows moving the mass hanging below the platform so that it is forward or behind the axle
+connecting the platform to the sphere.  This allows for the bot's motion to be controlled in the forward / reverse
+direction.  Once I am happy with my control scheme for this axis, then I will add the ability to tilt the mass to the
+left and right for turning when in motion.  Spinning the bot in-place is another future project.\\
+
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20151105-01.jpg}}\\
+
+My initial version of the bb-8 firmware used a very simple control loop for the main drive motor.  The amount of stick
+deflection on the RC transmitter was used to control the velocity of the motor.  A PI algorithm was used to close the
+loop between the desired velocity and the shaft encoder output.  The control obtained from such a setup was very similar
+to what I remember seeing in the ball bot projects 15 or so years ago.  There were oscillations when I stopped and it
+was tricky to keep the mass in the desired location and not actually
+[[https://github.com/adamgreen/bb-8/blob/master/images/20151102-02.gif | spin around inside the ball faster than the ball itself]].
+
+===How NOT to Debug and Program a BB-8
+To make the control system more stable, I wanted to pull the IMU into the control loop so that the stick deflection
+could be used to control the pitch of the platform (which relates to the drive torque applied).  This would make it
+similar to a Segway.  When I first started implementing this control loop in the firmware, I hit a number of issues in
+my code.  Each time I wanted to look at debug data from a test run or upload new firmware, I had to open the ball bot
+up, pull out the PCB from within the platform, and then connect to my PC via USB.  This was slow and I was really
+worried that I might break something.  I had to come up with a better debugging / programming solution.
+
+
+===Wireless Debugging/Programming Using ESP8266
+I had purchased a [[https://www.adafruit.com/products/2282 | $7 ESP8266 WiFi board]] from Adafruit a few months ago in
+the hopes that I could use it for a wireless interface to my mbed 1768.  I was now at the stage where having such a
+wireless interface would be awesome.  I had seen mention of
+[[https://github.com/jeelabs/esp-link | JEELABS' esp-Link firmware]] on Hackaday in the time since I had originally
+obtained the board and had filed it away under interesting links for this BB-8 project.  The ability of this firmware to
+create a simple to configure and use UART to WiFi bridge looked like it was probably ideal for my needs.  I have
+previously written a GDB compatible UART based debug monitor called [[https://github.com/adamgreen/mri#readme | MRI]]
+that works on the LPC1768.  If I could bridge the debugger's UART to WiFi then I would have an ideal debug solution.
+
+**The Good**: The esp-link firmware was very easy to configure and use as a transparent bridge to allow GDB to connect
+to a wireless TCP/IP socket from my Mac to MRI running on the LPC1768.  The feature set of my MRI debug monitor is
+comparable to a full-blown JTAG/SWD debugger and now it works wirelessly.
+
+**The Bad**: I had great difficulty getting the esp-link firmware installed on my ESP-1 board.  I tried to use
+[[https://github.com/themadinventor/esptool | esptool.py]] on my Ubuntu VM but I always got a "Failed to connect" error
+message.  I did find a number of mistakes that I made in my wiring as I read through the
+[[https://github.com/themadinventor/esptool/issues/19#issuecomment-129857548 | notes here]] but still I could never get
+a good connection.  In the end I gave up and used the
+[[https://github.com/nodemcu/nodemcu-flasher | NodeMCU Flash utility]] recommended by others on that
+[[https://github.com/themadinventor/esptool/issues/19 | same Github issue thread]].  That worked a charm.  It never gave
+any errors.  These flashing utilities required that my PC be connected to the ESP8266 device via its UART pins.  I used
+my mbed-LPC1768 as a USB to serial adapter with
+[[https://github.com/adamgreen/bb-8/blob/master/other/usb2serial/main.cpp | this firmware]] since I wanted that
+microcontroller connected to the ESP8266 anyway.
+
+Once I had a wireless debugging solution in place I was wondering if it could be utilized to facilitate wireless
+programming as well.  The MRI debug monitor doesn't support the GDB FLASHing commands since MRI itself is running in the
+same FLASH that we want to reprogram.  I came up with a two stage solution to this problem:
+* I wrote a [[https://github.com/adamgreen/bb-8/blob/master/mriprog/boot-lpc1768/main.c | UART based boot loader]] that
+  expects to run out RAM and not FLASH.
+** This boot loader can be loaded into RAM using MRI memory write commands from the GDB remote protocol.
+** The boot loader runs out of the upper RAM banks on the LPC1768.  The MRI debug monitor won't have any global or stack
+   variables in this portion of RAM.
+** The binary for this boot loader is <1000 bytes in length so that it doesn't take too long to load into RAM using the
+   GDB remote protocol.
+** Supports a protocol with commands for erasing all of FLASH, programming FLASH sectors in packets of <=16k data, and
+   resetting the device.
+** Automatically detects and uses the same UART as was being used by MRI previously.
+* I also wrote [[https://github.com/adamgreen/bb-8/blob/master/mriprog/mriprog-src/main.c | mriprog]].  This program
+  takes advantage of MRI and the UART boot loader to load new code into the FLASH.
+** It first connects to MRI running on the LPC1768 device via serial port or TCP/IP socket.
+** Loads the UART boot loader into the RAM of the LPC1768 device using GDB remote protocol memory write commands.
+** Uses GDB remote protocol commands to start execution of the boot loader in RAM.
+** Switches to talking the [[https://github.com/adamgreen/bb-8/blob/master/mriprog/includes/protocol.h | protocol]] used
+   by the serial boot loader.  It uses that protocol to erase the device, program the new contents into the FLASH, and
+   then reset the device.
+
+[[https://github.com/adamgreen/bb-8/blob/master/firmware/deployWiFi | This deployWiFi bash script]] shows the command
+line I use for running the mriprog tool in my environment.
+
+===ESP8266 Wiring
+I found great documentation on how to use the esp8266 device on
+[[http://neilkolban.com/tech/esp8266/ | Neil Kolban's site]].  The following image of the ESP8266 ESP-1 board and its
+pins was taken from **Kolban's Book on ESP8266**.\\
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20151102-03.png}}\\
+The following table gives an overview of what I connected to each of the pins on the ESP-1 board.
+
+|= ESP-1 board pin |= Connection |= Notes |
+| Vcc              | 3.3V        | Connect to LD1117-3.3V Regulator Output |
+| Reset            | Unconnected | I found it best to not connect |
+| CH_PD            | 3.3V        | Required to enable device |
+| TX               | mbed p14    | |
+| Gnd              | Ground      | |
+| GPIO_2           | 3.3V        | |
+| GPIO_0           | 3.3V        | Should allow to be pulled to ground for programming. |
+| RX               | mbed p13    | |
+
+|= LD1117 Regulator Pin |= Description |
+| Left                  | Ground       |
+| Center                | 3.3V Output  |
+| Right                 | Input Vcc    |
+
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20151105-02.jpg}}
+
+===BB-8 with IMU in Control Loop
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20151102-04.gif}}
+{{https://raw.githubusercontent.com/adamgreen/bb-8/master/images/20151102-05.gif}}
+
+Once I had a wireless debugging / programming solution in place, I was able to quickly iterate over the control code to
+produce a much more stable drive control system.  The above animations show the prototype running with the updated
+control loop.
+
+===New BB-8 Build Video from James Bruton
+James Bruton has started working on a new BB-8 build.  It is pretty cool.  Check out his video
+[[https://www.youtube.com/watch?v=Ut-B9PStF0M | here]].
 
 
 
@@ -52,7 +173,8 @@ the key devices on the board.  What follows are those updated wiring tables:
 | p10       | IMU SCL (4)               | |
 | p11       | Left Motor - Encoder A    | Yellow Wire (5) |
 | p12       | Left Motor - Encoder B    | White Wire (6) |
-| p13 - p14 | UART                      | **Reserved for debug monitor** |
+| p13       | ESP8266 RX                | WiFi Debugging/Programming |
+| p14       | ESP8266 TX                | WiFi Debugging/Programming |
 | p15       | Right Motor - Encoder A   | Yellow Wire (5) |
 | p16       | Right Motor - Encoder B   | White Wire (6) |
 | p17       | RC Channel 1              | Yaw Channel - Signal is White Wire (1) |
