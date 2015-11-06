@@ -59,12 +59,14 @@ public:
             controlOutput = m_controlOutputBias + m_Kp * error + integral - m_Kd * processDelta;
             if (controlOutput < m_controlMin)
             {
-                integral += (m_controlMin - controlOutput);
+                if (m_usesIntegral)
+                    integral += (m_controlMin - controlOutput);
                 controlOutput = m_controlMin;
             }
             else if (controlOutput > m_controlMax)
             {
-                integral -= (controlOutput - m_controlMax);
+                if (m_usesIntegral)
+                    integral -= (controlOutput - m_controlMax);
                 controlOutput = m_controlMax;
             }
             m_integral = integral;
@@ -105,11 +107,11 @@ public:
         assert( Ti >= 0.0f && Td >= 0.0f && sampleTime > 0.0f );
         m_Kp = Kc;
         m_Ki = (Ti == 0.0f) ? 0.0f : (Kc / Ti) * m_sampleTime;
-        m_Kd = (Td == 0.0f) ? 0.0f : (Kc / Td) / m_sampleTime;
+        m_Kd = (Td == 0.0f) ? 0.0f : (Kc * Td) / m_sampleTime;
+        m_usesIntegral = (Ti != 0.0f);
     }
 
 protected:
-    bool    m_isAuto;
     float   m_Kp;
     float   m_Ki;
     float   m_Kd;
@@ -121,6 +123,8 @@ protected:
     float   m_setPoint;
     float   m_integral;
     float   m_processLast;
+    bool    m_isAuto;
+    bool    m_usesIntegral;
 };
 
 #endif // PID_H_
