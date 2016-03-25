@@ -79,7 +79,7 @@ int main(int argc, const char** argv)
     uint32_t            endFlashTime = 0;
     ArmContext          context;
     BinaryFile          bootloader = { g_lpc1768Bootloader, sizeof(g_lpc1768Bootloader) };
-    BinaryFile          image;
+    BinaryFile          image = { NULL, 0 };
 
     /* Parse command line parameters. */
     if (argc != 3)
