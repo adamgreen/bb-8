@@ -51,7 +51,7 @@ void (*iapEntry)(uint32_t* ,uint32_t*) = IAP_LOCATION;
 #define IAP_COUNT_ERROR         6
 #define IAP_INVALID_SECTOR      7
 #define IAP_SECTOR_NOT_BLANK    8
-#define IAP_SECTOR_NOT_PREPARED_ FOR_WRITE_OPERATION 9
+#define IAP_SECTOR_NOT_PREPARED_FOR_WRITE_OPERATION 9
 #define IAP_COMPARE_ERROR       10
 #define IAP_BUSY                11
 
@@ -144,7 +144,7 @@ static void zeroFillBssSection(void)
 
 static void findMriUart(void)
 {
-    /* Default to UART0 if not able to find it above. */
+    /* Default to UART0 if not able to find it below. */
     g_pCurrentUart = g_uartConfigurations[0];
 
     /* Find UART being used by MRI which is the only UART interrupt which should be enabled at priority level 0. */
