@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015  Adam Green (https://github.com/adamgreen)
+/*  Copyright (C) 2016  Adam Green (https://github.com/adamgreen)
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -11,6 +11,7 @@
     GNU General Public License for more details.
 */
 /* 'Class' to manage the sending and receiving of packets to/from gdb.  Takes care of crc and ack/nak handling too. */
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 #include "IComm.h"
@@ -174,10 +175,10 @@ static void resetBufferToEnableFutureReadingOfValidPacketData(Packet* pPacket)
 
 
 static void sendPacket(Packet* pPacket);
-static void sendPacketHeaderByte(void);
-static void sendPacketData(Packet* pPacket);
-static void sendPacketChecksum(Packet* pPacket);
-static void sendByteAsHex(unsigned char byte);
+static void setPacketHeaderByte(Packet* pPacket);
+static void setPacketData(Packet* pPacket);
+static void setPacketChecksum(Packet* pPacket);
+static void setByteAsHex(Packet* pPacket, unsigned char byte);
 static int  receiveCharAfterSkippingControlC(Packet* pPacket);
 void packetSend(Packet* pPacket, Buffer* pBuffer)
 {
@@ -195,40 +196,54 @@ void packetSend(Packet* pPacket, Buffer* pBuffer)
 
 static void sendPacket(Packet* pPacket)
 {
+    static char cache[64 * 1024];
+    size_t      charCount;
+
+    /* Make sure that the buffer isn't too large to fit in the cache. */
+    if (bufferGetLength(pPacket->pBuffer) + 4 > sizeof(cache))
+    {
+        assert( bufferGetLength(pPacket->pBuffer) + 4 <= sizeof(cache) );
+        return;
+    }
+
     /* Send packet of format: "$<DataInHex>#<1ByteChecksumInHex> */
     bufferReset(pPacket->pBuffer);
     clearChecksum(pPacket);
+    pPacket->pCacheCurr = cache;
 
-    sendPacketHeaderByte();
-    sendPacketData(pPacket);
-    sendPacketChecksum(pPacket);
+    setPacketHeaderByte(pPacket);
+    setPacketData(pPacket);
+    setPacketChecksum(pPacket);
+
+    charCount = pPacket->pCacheCurr - cache;
+    IComm_SendBytes(g_pComm, cache, charCount);
 }
 
-static void sendPacketHeaderByte(void)
+static void setPacketHeaderByte(Packet* pPacket)
 {
-    IComm_SendChar(g_pComm, '$');
+    *pPacket->pCacheCurr++ = '$';
 }
 
-static void sendPacketData(Packet* pPacket)
+static void setPacketData(Packet* pPacket)
 {
     while (bufferBytesLeft(pPacket->pBuffer) > 0)
     {
         char currChar = bufferReadChar(pPacket->pBuffer);
-        IComm_SendChar(g_pComm, currChar);
+        *pPacket->pCacheCurr++ =  currChar;
         updateChecksum(pPacket, currChar);
     }
 }
 
-static void sendPacketChecksum(Packet* pPacket)
+static void setPacketChecksum(Packet* pPacket)
 {
-    IComm_SendChar(g_pComm, '#');
-    sendByteAsHex(pPacket->calculatedChecksum);
+    *pPacket->pCacheCurr++ =  '#';
+    setByteAsHex(pPacket, pPacket->calculatedChecksum);
 }
 
-static void sendByteAsHex(unsigned char byte)
+static void setByteAsHex(Packet* pPacket, unsigned char byte)
 {
-    IComm_SendChar(g_pComm, NibbleToHexChar[EXTRACT_HI_NIBBLE(byte)]);
-    IComm_SendChar(g_pComm, NibbleToHexChar[EXTRACT_LO_NIBBLE(byte)]);
+    *pPacket->pCacheCurr++ = NibbleToHexChar[EXTRACT_HI_NIBBLE(byte)];
+    *pPacket->pCacheCurr++ = NibbleToHexChar[EXTRACT_LO_NIBBLE(byte)];
 }
 
 static int receiveCharAfterSkippingControlC(Packet* pPacket)
