@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015  Adam Green (https://github.com/adamgreen)
+/*  Copyright (C) 2016  Adam Green (https://github.com/adamgreen)
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -30,6 +30,9 @@ static LPC_UART_TypeDef* const g_uartConfigurations[] =
 };
 
 static LPC_UART_TypeDef* g_pCurrentUart;
+
+static int      g_allSectorsErased;
+static uint32_t g_lastSectorErased = 0xFFFFFFFF;
 
 static const uint8_t g_startOfPacket[4] = PACKET_START_MARKER;
 
@@ -112,9 +115,14 @@ int main(void)
         case PACKET_TYPE_ERASE_ALL:
             iapResult = iapEraseAll();
             if (iapResult == IAP_CMD_SUCCESS)
+            {
+                g_allSectorsErased = 1;
                 sendAckPacket();
+            }
             else
+            {
                 sendNakPacket(iapResult);
+            }
             break;
         case PACKET_TYPE_WRITE:
             iapResult = iapWriteSectors(header.address, pData, header.length);
@@ -359,6 +367,20 @@ static int iapWriteSectors(uint32_t flashAddress, uint8_t* pData, uint32_t dataL
                4096 and can be padded safely without worrying about overflow. */
             memset(pData + dataLength, 0xFF, 4096 - dataLength);
             actualBytes = dataLength;
+        }
+
+        if (!g_allSectorsErased && g_lastSectorErased != sector)
+        {
+            /* If not all sectors were erased then erase each one the first time we write bytes to it. */
+            iapResult = iapPrepareSectors(sector, sector);
+            if (iapResult != IAP_CMD_SUCCESS)
+                return iapResult;
+
+            iapResult = iapEraseSectors(sector, sector);
+            if (iapResult != IAP_CMD_SUCCESS)
+                return iapResult;
+
+            g_lastSectorErased = sector;
         }
 
         iapResult = iapPrepareSectors(sector, sector);

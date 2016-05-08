@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015  Adam Green (https://github.com/adamgreen)
+/*  Copyright (C) 2016  Adam Green (https://github.com/adamgreen)
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -10,6 +10,7 @@
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
 */
+#include <ctype.h>
 #include <mach/mach_time.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -26,8 +27,11 @@
 
 static void displayUsage(void)
 {
-    fprintf(stderr, "Usage: mriprog deviceName image.elf\n"
-                    "Where: deviceName is serial or TCP/IP connection to use for\n"
+    fprintf(stderr, "Usage: mriprog [-e] deviceName image.elf\n"
+                    "Where: -e will erase all of FLASH before writing new contents.\n"
+                    "          The default is to only erase sectors that image\n"
+                    "          will replace.\n"
+                    "       deviceName is serial or TCP/IP connection to use for\n"
                     "                  communicating with MRI debug monitor.\n"
                     "                  Examples: /dev/tty.usbmodem1412\n"
                     "                            192.168.0.129:23\n"
@@ -35,14 +39,19 @@ static void displayUsage(void)
                     "                 load into FLASH.\n");
 }
 
-/* Locations in RAM where LPC1768 serial bootloader should be loaded. */
+/* Locations in RAM where LPC1768 serial bootloader should be loaded to not interfere with MRI. */
 #define LPC1768_RAM_START 0x2007c000
 #define LPC1768_RAM_SIZE  (32 * 1024)
 #define LPC1768_RAM_END   (LPC1768_RAM_START + LPC1768_RAM_SIZE)
 
-/* Locations in FLASH where LPC1768 code should be loaded. */
-#define LPC1768_FLASH_START 0x0000000
+#define COMMAND_LINE_FLAGS_ERASE_ALL (1 << 0)
 
+typedef struct CommandLine
+{
+    const char* pDeviceName;
+    const char* pFlashImagePath;
+    uint32_t    flags;
+} CommandLine;
 
 typedef struct BinaryFile
 {
@@ -53,6 +62,7 @@ typedef struct BinaryFile
 static const uint8_t g_startOfPacket[4] = PACKET_START_MARKER;
 
 
+static int parseCommandLine(CommandLine* pCommandLine, int argc, const char** argv);
 static BinaryFile openBinaryFile(const char* binaryFilename);
 static void closeBinaryFile(BinaryFile* pFile);
 static void checksumVectors(ElfRegions* pRegions);
@@ -71,8 +81,7 @@ int main(int argc, const char** argv)
 {
     int                 returnValue = 0;
     IComm*              pComm = NULL;
-    const char*         pDeviceName = NULL;
-    const char*         pFlashImagePath = NULL;
+    CommandLine         cmdLine = { NULL, NULL, 0 };
     ElfRegions*         pRegions = NULL;
     uint32_t            startFlashTime = 0;
     uint32_t            endFlashTime = 0;
@@ -82,29 +91,26 @@ int main(int argc, const char** argv)
     BinaryFile          bootloader = { g_lpc1768Bootloader, sizeof(g_lpc1768Bootloader) };
     BinaryFile          image = { NULL, 0 };
 
-    /* Parse command line parameters. */
-    if (argc != 3)
+    if (!parseCommandLine(&cmdLine, argc, argv))
     {
         displayUsage();
         return -1;
     }
-    pDeviceName = argv[1];
-    pFlashImagePath = argv[2];
 
     __try
     {
         crcTableInit();
 
-        printf("Opening connection to %s...\n", pDeviceName);
-        if (pDeviceName == strstr(pDeviceName, "/dev/tty"))
-            pComm = SerialIComm_Init(pDeviceName, 230400, 1000);
+        printf("Opening connection to %s...\n", cmdLine.pDeviceName);
+        if (cmdLine.pDeviceName == strstr(cmdLine.pDeviceName, "/dev/tty"))
+            pComm = SerialIComm_Init(cmdLine.pDeviceName, 230400, 2000);
         else
-            pComm = SocketIComm_Init(pDeviceName, 10000);
+            pComm = SocketIComm_Init(cmdLine.pDeviceName, 10000);
 
-        printf("Loading new flash image %s...\n", pFlashImagePath);
-        image = openBinaryFile(pFlashImagePath);
+        printf("Loading new flash image %s...\n", cmdLine.pFlashImagePath);
+        image = openBinaryFile(cmdLine.pFlashImagePath);
 
-        printf("Finding loadable regions in %s...\n", pFlashImagePath);
+        printf("Finding loadable regions in %s...\n", cmdLine.pFlashImagePath);
         pRegions = ElfLoad_FromMemory(image.pBinary, image.binarySize);
 
         printf("Checksumming flash vector table...\n");
@@ -124,8 +130,11 @@ int main(int argc, const char** argv)
         gdbRemoteContinue();
         waitForInitCompletedPacket(pComm);
 
-        printf("Erasing all of FLASH...\n");
-        sendEraseAllPacket(pComm);
+        if (cmdLine.flags & COMMAND_LINE_FLAGS_ERASE_ALL)
+        {
+            printf("Erasing all of FLASH...\n");
+            sendEraseAllPacket(pComm);
+        }
 
         startFlashTime = getTimeInMicroseconds();
         for (i = 0 ; i < pRegions->count ; i++)
@@ -178,6 +187,56 @@ int main(int argc, const char** argv)
     SerialIComm_Uninit(pComm);
 
     return returnValue;
+}
+
+static int parseCommandLine(CommandLine* pCommandLine, int argc, const char** argv)
+{
+    int i;
+
+    memset(pCommandLine, 0, sizeof(*pCommandLine));
+
+    for (i = 1 ; i < argc ; i++)
+    {
+        const char* pArg = argv[i];
+
+        if (pArg[0] == '-')
+        {
+            switch (tolower(pArg[1]))
+            {
+            case 'e':
+                pCommandLine->flags |= COMMAND_LINE_FLAGS_ERASE_ALL;
+                break;
+            default:
+                fprintf(stderr, "error: '%s' command line parameters isn't recognized.\n", pArg);
+                return 0;
+            }
+        }
+        else
+        {
+            /* Parameters that don't start with '-' are order dependent. */
+            if (!pCommandLine->pDeviceName)
+            {
+                pCommandLine->pDeviceName = pArg;
+            }
+            else if (!pCommandLine->pFlashImagePath)
+            {
+                pCommandLine->pFlashImagePath = pArg;
+            }
+            else
+            {
+                fprintf(stderr, "error: '%s' command line parameter wasn't expected.\n", pArg);
+                return 0;
+            }
+        }
+    }
+
+    if (!pCommandLine->pDeviceName || !pCommandLine->pFlashImagePath)
+    {
+        fprintf(stderr, "error: Both deviceName and image.elf parameters must be specified.\n");
+        return 0;
+    }
+
+    return 1;
 }
 
 static BinaryFile openBinaryFile(const char* binaryFilename)
@@ -263,7 +322,7 @@ static void readPacketHeader(IComm* pComm, PacketHeader* pHeader)
 
     if (pHeader->type == PACKET_TYPE_NAK)
     {
-        fprintf(stderr, "error: Device returned NAK with error %u\n", pHeader->errorCode);
+        fprintf(stderr, "error: Device returned NAK with error %u.\n", pHeader->errorCode);
         return;
     }
 
