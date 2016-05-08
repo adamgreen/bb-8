@@ -34,6 +34,7 @@
 #define fileException                       13
 #define outOfMemoryException                14
 #define socketException                     15
+#define elfFormatException                  16
 
 
 #ifndef __debugbreak

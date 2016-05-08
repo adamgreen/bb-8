@@ -16,6 +16,7 @@
 #include <string.h>
 #include <protocol.h>
 #include "common.h"
+#include "ElfLoad.h"
 #include "gdbRemote.h"
 #include "packet.h"
 #include "SerialIComm.h"
@@ -25,13 +26,13 @@
 
 static void displayUsage(void)
 {
-    fprintf(stderr, "Usage: mriprog deviceName flashImage.bin\n"
+    fprintf(stderr, "Usage: mriprog deviceName image.elf\n"
                     "Where: deviceName is serial or TCP/IP connection to use for\n"
                     "                  communicating with MRI debug monitor.\n"
                     "                  Examples: /dev/tty.usbmodem1412\n"
                     "                            192.168.0.129:23\n"
-                    "       flashImage.bin is the pathname of the new image to\n"
-                    "                      load into FLASH.\n");
+                    "       image.elf is the pathname of the new firmware to\n"
+                    "                 load into FLASH.\n");
 }
 
 /* Locations in RAM where LPC1768 serial bootloader should be loaded. */
@@ -54,7 +55,7 @@ static const uint8_t g_startOfPacket[4] = PACKET_START_MARKER;
 
 static BinaryFile openBinaryFile(const char* binaryFilename);
 static void closeBinaryFile(BinaryFile* pFile);
-static void checksumVectors(BinaryFile* pFile);
+static void checksumVectors(ElfRegions* pRegions);
 static void waitForInitCompletedPacket(IComm* pComm);
 static void readPacketHeader(IComm* pComm, PacketHeader* pHeader);
 static void waitForStartOfPacket(IComm* pComm);
@@ -72,11 +73,11 @@ int main(int argc, const char** argv)
     IComm*              pComm = NULL;
     const char*         pDeviceName = NULL;
     const char*         pFlashImagePath = NULL;
-    uint32_t            flashBytesLeft = 0;
-    uint32_t            flashAddress = 0;
-    uint8_t*            pFlash = NULL;
+    ElfRegions*         pRegions = NULL;
     uint32_t            startFlashTime = 0;
     uint32_t            endFlashTime = 0;
+    uint32_t            bytesWritten = 0;
+    size_t              i = 0;
     ArmContext          context;
     BinaryFile          bootloader = { g_lpc1768Bootloader, sizeof(g_lpc1768Bootloader) };
     BinaryFile          image = { NULL, 0 };
@@ -103,8 +104,11 @@ int main(int argc, const char** argv)
         printf("Loading new flash image %s...\n", pFlashImagePath);
         image = openBinaryFile(pFlashImagePath);
 
+        printf("Finding loadable regions in %s...\n", pFlashImagePath);
+        pRegions = ElfLoad_FromMemory(image.pBinary, image.binarySize);
+
         printf("Checksumming flash vector table...\n");
-        checksumVectors(&image);
+        checksumVectors(pRegions);
 
         /* Sending '+' will ACK any outstanding packet from MRI or force MRI to stop execution if still running. */
         IComm_SendChar(pComm, '+');
@@ -123,22 +127,28 @@ int main(int argc, const char** argv)
         printf("Erasing all of FLASH...\n");
         sendEraseAllPacket(pComm);
 
-        printf("Writing %u bytes to FLASH...\n", image.binarySize);
         startFlashTime = getTimeInMicroseconds();
-        flashBytesLeft = image.binarySize;
-        flashAddress = LPC1768_FLASH_START;
-        pFlash = image.pBinary;
-        while (flashBytesLeft > 0)
+        for (i = 0 ; i < pRegions->count ; i++)
         {
-            uint32_t bytesToSend = flashBytesLeft > PACKET_MAX_DATA ? PACKET_MAX_DATA : flashBytesLeft;
-            sendWritePacket(pComm, flashAddress, pFlash, bytesToSend);
-            flashBytesLeft -= bytesToSend;
-            flashAddress += bytesToSend;
-            pFlash += bytesToSend;
+            ElfRegion*      pRegion = &pRegions->pRegions[i];
+            uint32_t        flashBytesLeft = pRegion->size;
+            uint32_t        flashAddress = pRegion->address;
+            const uint8_t*  pFlash = pRegion->pData;
+
+            printf("Writing %u bytes to FLASH at address 0x%08X...\n", pRegion->size, pRegion->address);
+            while (flashBytesLeft > 0)
+            {
+                uint32_t bytesToSend = flashBytesLeft > PACKET_MAX_DATA ? PACKET_MAX_DATA : flashBytesLeft;
+                sendWritePacket(pComm, flashAddress, pFlash, bytesToSend);
+                flashBytesLeft -= bytesToSend;
+                flashAddress += bytesToSend;
+                pFlash += bytesToSend;
+                bytesWritten += bytesToSend;
+            }
         }
         endFlashTime = getTimeInMicroseconds();
-        printf("    Wrote %u bytes in %u microseconds\n", image.binarySize, endFlashTime - startFlashTime);
-        printf("    %.3f kB / second\n", (image.binarySize / 1024.0f) / ((endFlashTime - startFlashTime) / 1000000.0f));
+        printf("    Wrote %u bytes in %u microseconds\n", bytesWritten, endFlashTime - startFlashTime);
+        printf("    %.3f kB / second\n", (bytesWritten / 1024.0f) / ((endFlashTime - startFlashTime) / 1000000.0f));
 
         printf("Resetting device...\n");
         sendResetPacket(pComm);
@@ -150,6 +160,9 @@ int main(int argc, const char** argv)
         case timeoutException:
             fprintf(stderr, "error: Timed out waiting for response from device.\n");
             break;
+        case elfFormatException:
+            fprintf(stderr, "error: Encountered error parsing ELF file.\n");
+            break;
         default:
             fprintf(stderr, "error: Encountered unexpected exception %d\n", getExceptionCode());
             break;
@@ -158,6 +171,8 @@ int main(int argc, const char** argv)
         returnValue = -1;
     }
 
+    ElfLoad_FreeRegions(pRegions);
+    pRegions = NULL;
     closeBinaryFile(&image);
     gdbRemoteUninit();
     SerialIComm_Uninit(pComm);
@@ -213,13 +228,15 @@ static void closeBinaryFile(BinaryFile* pFile)
     memset(pFile, 0, sizeof(*pFile));
 }
 
-static void checksumVectors(BinaryFile* pFile)
+static void checksumVectors(ElfRegions* pRegions)
 {
-    uint32_t* pVectors = (uint32_t*)pFile->pBinary;
+    /* Assume that the first loadable region contains the vectors since it will with our linker scripts. */
+    ElfRegion* pFirstRegion = &pRegions->pRegions[0];
+    uint32_t* pVectors = (uint32_t*)pFirstRegion->pData;
     uint32_t  checksum = 0;
     int       i;
 
-    if (pFile->binarySize < 8 * sizeof(uint32_t))
+    if (pFirstRegion->size < 8 * sizeof(uint32_t))
         return;
     for (i = 0 ; i < 7 ; i++)
         checksum += pVectors[i];
