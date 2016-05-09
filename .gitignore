@@ -8,6 +8,7 @@
 *.o
 *.d
 *.log
+*.csv
 mriprog/generated/
 mriprog/bin2h
 mriprog/mriprog
