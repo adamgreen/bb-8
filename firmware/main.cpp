@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015  Adam Green (https://github.com/adamgreen)
+/*  Copyright (C) 2016  Adam Green (https://github.com/adamgreen)
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License
@@ -101,6 +101,8 @@ static PwmIn                        g_radioPitch(p18, RADIO_TIMEOUT);
 static PID                          g_rollPID(0.0059f, 0.04f, 0.0f, 0.30f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
 static PID                          g_pitchPID(1.0f, 0.0f, 0.0f, 0.0f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
 static Motor                        g_motors(p22, p29, p30, p21, p20, p19, p26, MAX_MOTOR_POWER, MAX_MOTOR_POWER, PWM_PERIOD);
+static Ticker                       g_ticker;
+static bool                         g_motorsSetup = false;
 // Note: Encoders object should be constructed after any other objects using InterruptIn so that the interrupt
 //       handlers get chained together properly.
 static Encoders<p12, p11, p15, p16> g_encoders;
@@ -120,6 +122,7 @@ static LocalFileSystem              g_local("local");
 static void initInterruptPriorities();
 static int initIMU();
 static void updateMotorOutputs(float pitchValue, float rollValue, float period);
+static void attachTicker();
 static void tickHandler();
 static void readLatestImuPacket(Quaternion* pQuaternion);
 static int runDefaultMode();
@@ -137,7 +140,6 @@ static int runPitchCalibrateMode();
 
 int main()
 {
-    Ticker ticker;
 
     g_serial.baud(230400);
     initInterruptPriorities();
@@ -150,8 +152,8 @@ int main()
     }
 
     updateMotorOutputs(0.0f, 0.0f, PWM_PERIOD);
-
-    ticker.attach(tickHandler, PID_INTERVAL);
+    attachTicker();
+    g_motorsSetup = true;
 
     switch (g_programMode)
     {
@@ -215,6 +217,11 @@ static void updateMotorOutputs(float pitchValue, float rollValue, float period)
     g_rollPID.setOutputManually(rollValue);
 
     g_serial.printf("Manual PWM Mode - PWM frequency = %f\n", 1.0f / period);
+}
+
+static void attachTicker()
+{
+    g_ticker.attach(tickHandler, PID_INTERVAL);
 }
 
 static void tickHandler()
@@ -685,4 +692,33 @@ static int runPitchCalibrateMode()
     }
 
     return 0;
+}
+
+
+/* These are hooks that get called by the MRI debug monitor whenever it takes/releases control of the CPU.
+   The implementation of this code makes sure that the motors are turned off when entering debug monitor control and
+   then allows the existing main loop code to recover once it starts running again. */
+extern "C" void __mriPlatform_EnteringDebuggerHook(void)
+{
+    /* Don't do anything until the global constructors have been executed to setup the motor and PID global objects. */
+    if (!g_motorsSetup)
+        return;
+
+    g_ticker.detach();
+    g_pitchPID.setOutputManually(0.0f);
+    g_rollPID.setOutputManually(0.0f);
+    g_tick.pitchPWM = 0.0f;
+    g_tick.rollPWM = 0.0f;
+    g_motors.set(g_tick.pitchPWM, g_tick.rollPWM);
+}
+
+extern "C" void __mriPlatform_LeavingDebuggerHook(void)
+{
+    /* Don't do anything until the global constructors have been executed to setup the motor and PID global objects. */
+    if (!g_motorsSetup)
+        return;
+
+    /* The ticker is stopped and then restarted after leaving the debug monitor so that it doesn't fall behind and
+       then attempt to aggressively catch up. */
+    attachTicker();
 }
