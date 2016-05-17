@@ -33,6 +33,7 @@ Above image from
 [[http://brettbeauregard.com/blog/2012/01/arduino-pid-autotune-library/ | Brett Beauregard's Relay Method Tuning Notes]]\\
 [[http://neilkolban.com/tech/esp8266/ | Neil Kolban's ESP8266 Documentation]]\\
 [[https://github.com/jeelabs/esp-link | JEELABS' esp-Link firmware]]\\
+[[https://store.invensense.com/Datasheets/invensense/RM-MPU-9150A-00-v3.0.pdf | InvenSense MPU-9150 9-axis Motion Processing Unit Register Map & Description]]\\
 
 
 
