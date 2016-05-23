@@ -16,7 +16,7 @@ class I2Cdev {
     private:
         I2C i2c;
     public:
-        I2Cdev(PinName i2cSda = DEFAULT_I2C_SDA, PinName i2cScl = DEFAULT_I2C_SCL);
+        I2Cdev(PinName i2cSda = DEFAULT_I2C_SDA, PinName i2cScl = DEFAULT_I2C_SCL, int frequency = 100000);
         
         int8_t readBit(uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint8_t *data, uint16_t timeout=I2Cdev::readTimeout());
         int8_t readBitW(uint8_t devAddr, uint8_t regAddr, uint8_t bitNum, uint16_t *data, uint16_t timeout=I2Cdev::readTimeout());

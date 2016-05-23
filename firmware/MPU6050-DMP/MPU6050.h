@@ -485,8 +485,8 @@ class MPU6050 {
     protected:
         I2Cdev i2Cdev;
     public:
-        MPU6050(PinName sdaPin, PinName sclPin);
-        MPU6050(PinName sdaPin, PinName sclPin, uint8_t address);
+        MPU6050(PinName sdaPin, PinName sclPin, int frequency = 100000);
+        MPU6050(PinName sdaPin, PinName sclPin, uint8_t address, int frequency = 100000);
 
         void initialize();
         bool testConnection();
@@ -871,9 +871,13 @@ class MPU6050 {
         uint8_t getDMPConfig2();
         void setDMPConfig2(uint8_t config);
 
+    private:
+        uint8_t devAddr;
+        uint8_t buffer[14];
+
+    public:
         // special methods for MotionApps 2.0 implementation
         #ifdef MPU6050_INCLUDE_DMP_MOTIONAPPS20
-            uint8_t *dmpPacketBuffer;
             uint16_t dmpPacketSize;
 
             uint8_t dmpInitialize();
@@ -974,7 +978,6 @@ class MPU6050 {
 
         // special methods for MotionApps 4.1 implementation
         #ifdef MPU6050_INCLUDE_DMP_MOTIONAPPS41
-            uint8_t *dmpPacketBuffer;
             uint16_t dmpPacketSize;
 
             uint8_t dmpInitialize();
@@ -1073,10 +1076,6 @@ class MPU6050 {
             void dmpOverrideQuaternion(long *q);
             uint16_t dmpGetFIFOPacketSize();
         #endif
-
-    private:
-        uint8_t devAddr;
-        uint8_t buffer[14];
 };
 
 #endif /* _MPU6050_H_ */

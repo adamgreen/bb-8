@@ -587,9 +587,6 @@ uint8_t MPU6050::dmpInitialize() {
 
             DEBUG_PRINTLN(F("Setting up internal 48-byte (default) DMP packet buffer..."));
             dmpPacketSize = 48;
-            /*if ((dmpPacketBuffer = (uint8_t *)malloc(42)) == 0) {
-                return 3; // TODO: proper error code for no memory
-            }*/
 
             DEBUG_PRINTLN(F("Resetting FIFO and clearing INT status one last time..."));
             resetFIFO();
@@ -634,7 +631,6 @@ bool MPU6050::dmpPacketAvailable() {
 
 uint8_t MPU6050::dmpGetAccel(int32_t *data, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     data[0] = (((int32_t)packet[34] << 24) | ((int32_t)packet[35] << 16) | ((int32_t)packet[36] << 8) | packet[37]);
     data[1] = (((int32_t)packet[38] << 24) | ((int32_t)packet[39] << 16) | ((int32_t)packet[40] << 8) | packet[41]);
     data[2] = (((int32_t)packet[42] << 24) | ((int32_t)packet[43] << 16) | ((int32_t)packet[44] << 8) | packet[45]);
@@ -642,7 +638,6 @@ uint8_t MPU6050::dmpGetAccel(int32_t *data, const uint8_t* packet) {
 }
 uint8_t MPU6050::dmpGetAccel(int16_t *data, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     data[0] = ((int16_t)packet[34] << 8) | packet[35];
     data[1] = ((int16_t)packet[38] << 8) | packet[39];
     data[2] = ((int16_t)packet[42] << 8) | packet[43];
@@ -650,7 +645,6 @@ uint8_t MPU6050::dmpGetAccel(int16_t *data, const uint8_t* packet) {
 }
 uint8_t MPU6050::dmpGetAccel(VectorInt16 *v, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     v -> x = ((int16_t)packet[34] << 8) | packet[35];
     v -> y = ((int16_t)packet[38] << 8) | packet[39];
     v -> z = ((int16_t)packet[42] << 8) | packet[43];
@@ -658,7 +652,6 @@ uint8_t MPU6050::dmpGetAccel(VectorInt16 *v, const uint8_t* packet) {
 }
 uint8_t MPU6050::dmpGetQuaternion(int32_t *data, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     data[0] = (((int32_t)packet[0] << 24) | ((int32_t)packet[1] << 16) | ((int32_t)packet[2] << 8) | packet[3]);
     data[1] = (((int32_t)packet[4] << 24) | ((int32_t)packet[5] << 16) | ((int32_t)packet[6] << 8) | packet[7]);
     data[2] = (((int32_t)packet[8] << 24) | ((int32_t)packet[9] << 16) | ((int32_t)packet[10] << 8) | packet[11]);
@@ -667,7 +660,6 @@ uint8_t MPU6050::dmpGetQuaternion(int32_t *data, const uint8_t* packet) {
 }
 uint8_t MPU6050::dmpGetQuaternion(int16_t *data, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     data[0] = (((int16_t)packet[0] << 8) | packet[1]);
     data[1] = (((int16_t)packet[4] << 8) | packet[5]);
     data[2] = (((int16_t)packet[8] << 8) | packet[9]);
@@ -691,7 +683,6 @@ uint8_t MPU6050::dmpGetQuaternion(Quaternion *q, const uint8_t* packet) {
 // uint8_t MPU6050::dmpGetRelativeQuaternion(long *data, const uint8_t* packet);
 uint8_t MPU6050::dmpGetGyro(int32_t *data, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     data[0] = (((int32_t)packet[16] << 24) | ((int32_t)packet[17] << 16) | ((int32_t)packet[18] << 8) | packet[19]);
     data[1] = (((int32_t)packet[20] << 24) | ((int32_t)packet[21] << 16) | ((int32_t)packet[22] << 8) | packet[23]);
     data[2] = (((int32_t)packet[24] << 24) | ((int32_t)packet[25] << 16) | ((int32_t)packet[26] << 8) | packet[27]);
@@ -699,7 +690,6 @@ uint8_t MPU6050::dmpGetGyro(int32_t *data, const uint8_t* packet) {
 }
 uint8_t MPU6050::dmpGetGyro(int16_t *data, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     data[0] = ((int16_t)packet[16] << 8) | packet[17];
     data[1] = ((int16_t)packet[20] << 8) | packet[21];
     data[2] = ((int16_t)packet[24] << 8) | packet[25];
@@ -707,7 +697,6 @@ uint8_t MPU6050::dmpGetGyro(int16_t *data, const uint8_t* packet) {
 }
 uint8_t MPU6050::dmpGetMag(int16_t *data, const uint8_t* packet) {
     // TODO: accommodate different arrangements of sent data (ONLY default supported now)
-    if (packet == 0) packet = dmpPacketBuffer;
     data[0] = ((int16_t)packet[28] << 8) | packet[29];
     data[1] = ((int16_t)packet[30] << 8) | packet[31];
     data[2] = ((int16_t)packet[32] << 8) | packet[33];
@@ -766,13 +755,6 @@ uint8_t MPU6050::dmpGetYawPitchRoll(float *data, Quaternion *q, VectorFloat *gra
 // uint8_t MPU6050::dmpGetQuaternionFloat(float *data, const uint8_t* packet);
 
 uint8_t MPU6050::dmpProcessFIFOPacket(const unsigned char *dmpData) {
-    /*for (uint8_t k = 0; k < dmpPacketSize; k++) {
-        if (dmpData[k] < 0x10) Serial.print("0");
-        Serial.print(dmpData[k], HEX);
-        Serial.print(" ");
-    }
-    Serial.print("\n");*/
-    //Serial.println((uint16_t)dmpPacketBuffer);
     return 0;
 }
 uint8_t MPU6050::dmpReadAndProcessFIFOPacket(uint8_t numPackets, uint8_t *processed) {

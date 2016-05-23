@@ -45,7 +45,9 @@ THE SOFTWARE.
 /** Default constructor, uses default I2C address.
  * @see MPU6050_DEFAULT_ADDRESS
  */
-MPU6050::MPU6050(PinName sdaPin, PinName sclPin) : i2Cdev(sdaPin, sclPin) {
+MPU6050::MPU6050(PinName sdaPin, PinName sclPin, int frequency /* = 100000 */)
+    : i2Cdev(sdaPin, sclPin, frequency)
+{
     devAddr = MPU6050_DEFAULT_ADDRESS;
 }
 
@@ -55,7 +57,9 @@ MPU6050::MPU6050(PinName sdaPin, PinName sclPin) : i2Cdev(sdaPin, sclPin) {
  * @see MPU6050_ADDRESS_AD0_LOW
  * @see MPU6050_ADDRESS_AD0_HIGH
  */
-MPU6050::MPU6050(PinName sdaPin, PinName sclPin, uint8_t address) : i2Cdev(sdaPin, sclPin) {
+MPU6050::MPU6050(PinName sdaPin, PinName sclPin, uint8_t address, int frequency /* = 100000 */)
+    : i2Cdev(sdaPin, sclPin, frequency)
+{
     devAddr = address;
 }
 

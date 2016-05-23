@@ -5,8 +5,10 @@
 
 #include "I2Cdev.h"
 
-I2Cdev::I2Cdev(PinName i2cSda, PinName i2cScl): i2c(i2cSda,i2cScl)
+I2Cdev::I2Cdev(PinName i2cSda, PinName i2cScl, int frequency /* = 100000 */)
+    : i2c(i2cSda,i2cScl)
 {
+    i2c.frequency(frequency);
 }
 
 /** Read a single bit from an 8-bit device register.
