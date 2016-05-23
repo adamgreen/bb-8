@@ -41,7 +41,7 @@
 #define MAX_MOTOR_POWER 0.50f
 
 // Interval between PID updates (in seconds).
-#define PID_INTERVAL (1.0f / 200.0f)
+#define PID_INTERVAL (1.0f / 250.0f)
 
 // Set to non-zero if you want to see raw gyro readings dumped to get a feel for drift.
 #define DUMP_GYRO_RATINGS 0
@@ -51,13 +51,16 @@
 #define PWM_DUTY_CYCLE_MIN 0.0530f
 #define PWM_DUTY_CYCLE_MAX 0.0951f
 
-// The radio should send a pulse 50 times a second so if we go 1/25th of a second without receiving 1 then flag as a
-// time out.
-#define RADIO_TIMEOUT (2 * (1000000 / 25))
+// The radio should send a pulse 50 times a second. Timeout if we don't receive a pulse for some time.
+// This timeout is in microseconds.
+#define RADIO_TIMEOUT (2 * (1000000 / 50))
 
 #ifndef M_PI
 const float M_PI = 3.14159265f;
 #endif
+
+// The frequency to use for I2C communication with the MPU-6050 IMU.
+#define MPU_I2C_FREQUENCY 400000
 
 // Which element in the IMU's ypr array represents our platform pitch.
 #define PITCH_ELEMENT 1
@@ -69,7 +72,7 @@ const float M_PI = 3.14159265f;
 #define PITCH_CALIBRATE_ANGLE (15.0f * (M_PI / 180.f))
 
 // PWM duty cycle to use when peforming the pitch calibration.
-#define PITCH_CALIBRATE_PWM 0.20f
+#define PITCH_CALIBRATE_PWM 0.25f
 
 
 // Run modes for this program.
@@ -95,11 +98,11 @@ struct TickInfo
 };
 
 static Serial                       g_serial(USBTX, USBRX);
-static MPU6050                      g_mpu(p9, p10);
+static MPU6050                      g_mpu(p9, p10, MPU_I2C_FREQUENCY);
 static PwmIn                        g_radioYaw(p17, RADIO_TIMEOUT);
 static PwmIn                        g_radioPitch(p18, RADIO_TIMEOUT);
 static PID                          g_rollPID(0.0059f, 0.04f, 0.0f, 0.30f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
-static PID                          g_pitchPID(1.0f, 0.0f, 0.0f, 0.0f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
+static PID                          g_pitchPID(3.175f, 0.280f, 0.019f, 0.0f, -MAX_MOTOR_POWER, MAX_MOTOR_POWER, PID_INTERVAL);
 static Motor                        g_motors(p22, p29, p30, p21, p20, p19, p26, MAX_MOTOR_POWER, MAX_MOTOR_POWER, PWM_PERIOD);
 static Ticker                       g_ticker;
 static bool                         g_motorsSetup = false;
@@ -140,7 +143,6 @@ static int runPitchCalibrateMode();
 
 int main()
 {
-
     g_serial.baud(230400);
     initInterruptPriorities();
 
@@ -194,10 +196,12 @@ static int initIMU()
         return devStatus;
     }
 
+#ifdef UNDONE
     // Setting gyro bias to reduce drift.
 	g_mpu.setXGyroOffsetTC(7);
 	g_mpu.setYGyroOffsetTC(-4);
 	g_mpu.setZGyroOffsetTC(11);
+#endif // UNDONE
 
     g_mpu.setDMPEnabled(true);
 
@@ -616,7 +620,6 @@ static int runPitchCalibrateMode()
 
         // Run the calibration test now by oscillating back and forth and recording the resulting data.
         g_serial.printf("Running pitch calibration test...\n\n");
-        g_serial.printf("time,pitchPWM,pitchEncoder,yaw,pitch,roll\n");
         g_pLog = (float*)&g_log1[0];
         for (;;)
         {
@@ -634,14 +637,7 @@ static int runPitchCalibrateMode()
             ypr[1] = atan2f(gravity.x, gravity.z);
             ypr[2] = atan2f(gravity.x, gravity.y);
 
-            float pitchAngle = ypr[PITCH_ELEMENT];
-            if (PITCH_INVERT)
-                pitchAngle = -pitchAngle;
-
-            g_serial.printf("%lu,%.2f,%ld,%.2f\n",
-                   tick.time,
-                   tick.pitchPWM, tick.counts.encoder1Count,
-                   pitchAngle * 180.0f/M_PI);
+            float pitchAngle = PITCH_INVERT ? -ypr[PITCH_ELEMENT] : ypr[PITCH_ELEMENT];
 
             // Keep logging data until we run out of RAM to store it all.
             *g_pLog++ = tick.pitchPWM;
@@ -659,7 +655,7 @@ static int runPitchCalibrateMode()
                 }
                 break;
             case PITCH_BACKWARD:
-                if (pitchAngle < PITCH_CALIBRATE_ANGLE)
+                if (pitchAngle < -PITCH_CALIBRATE_ANGLE)
                 {
                     pitchPwm = PITCH_CALIBRATE_PWM;
                     pitchMode = PITCH_FORWARD;
@@ -667,7 +663,7 @@ static int runPitchCalibrateMode()
                 break;
             }
 
-            g_pitchPID.setOutputManually(pitchPwm);
+            g_tick.pitchPWM = pitchPwm;
         }
 
         // Get here once the log has been filled.
