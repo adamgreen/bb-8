@@ -52,10 +52,12 @@ static uint32_t g_crcTable[256];
 
 static inline void crcTableInit(void)
 {
-    for (int i = 0; i <= 255; i++)
+    int i;
+    for (i = 0; i <= 255; i++)
     {
         uint32_t crc = i;
-        for (int j = 7; j >= 0; j--)
+        int j;
+        for (j = 7; j >= 0; j--)
         {
             uint32_t mask = -(crc & 1);
             crc = (crc >> 1) ^ (0xEDB88320 & mask);

@@ -84,9 +84,10 @@ int main(int argc, const char** argv)
         while (bytesLeft > 0)
         {
             uint32_t bytesToWrite = (bytesLeft > 16) ? 16 : bytesLeft;
+            uint32_t i;
 
             fprintf(pOutputFile, "  ");
-            for (uint32_t i = 0 ; i < bytesToWrite ; i++)
+            for (i = 0 ; i < bytesToWrite ; i++)
             {
                 fprintf(pOutputFile, "0x%02X", *pCurr++);
                 if (--bytesLeft)
