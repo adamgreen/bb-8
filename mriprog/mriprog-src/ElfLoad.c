@@ -197,6 +197,7 @@ static void growRegionArrayToFitNewEntry(ElfRegions* pRegions)
     if (!pRealloc)
         __throw(outOfMemoryException);
 
+    memset(&pRealloc[newCount-1], 0, sizeof(*pRealloc));
     pRegions->pRegions = pRealloc;
     pRegions->count = newCount;
 }
