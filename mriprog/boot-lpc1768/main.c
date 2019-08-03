@@ -152,15 +152,17 @@ static void zeroFillBssSection(void)
 
 static void findMriUart(void)
 {
-    /* Default to UART0 if not able to find it below. */
     g_pCurrentUart = g_uartConfigurations[0];
+    uint32_t highestPriority = NVIC_GetPriority(UART0_IRQn);
 
-    /* Find UART being used by MRI which is the only UART interrupt which should be enabled at priority level 0. */
-    for (int i = 0 ; i < 4 ; i++)
+    /* Find UART being used by MRI which is the UART interrupt at the highest priority. */
+    for (int i = 1 ; i < 4 ; i++)
     {
-        if (NVIC_GetPriority(UART0_IRQn + i) == 0 && isInterruptEnabled(UART0_IRQn + i))
+        uint32_t priority = NVIC_GetPriority(UART0_IRQn + i);
+        if (priority < highestPriority && isInterruptEnabled(UART0_IRQn + i))
         {
             g_pCurrentUart = g_uartConfigurations[i];
+            highestPriority = priority;
             return;
         }
     }
