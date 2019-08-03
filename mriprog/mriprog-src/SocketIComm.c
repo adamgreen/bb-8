@@ -233,14 +233,21 @@ static int receiveChar(IComm* pComm)
     return (int)byte;
 }
 
-static void receiveBytes(IComm* pComm, void* pvBuffer, size_t bufferSize)
+static void receiveBytes(IComm* pComm, void* pvBuffer, size_t bytesToRead)
 {
     SocketIComm*   pThis = (SocketIComm*)pComm;
+    uint8_t*       pCurr = (uint8_t*)pvBuffer;
+    size_t         bytesLeft = bytesToRead;
     ssize_t        bytesRead = 0;
 
-    bytesRead = recv(pThis->socket, pvBuffer, bufferSize, 0);
-    if (bytesRead == -1)
-        __throw(socketException);
+    while (bytesLeft > 0)
+    {
+        bytesRead = recv(pThis->socket, pCurr, bytesLeft, 0);
+        if (bytesRead == -1)
+            __throw(socketException);
+        pCurr += bytesRead;
+        bytesLeft -= bytesRead;
+    }
 
     if (SOCKET_LOG && pThis->pLogFile)
     {
@@ -248,11 +255,11 @@ static void receiveBytes(IComm* pComm, void* pvBuffer, size_t bufferSize)
             fwrite("\n[r]", 1, 4, pThis->pLogFile);
         pThis->writeLast = 0;
 
-        uint8_t* pBytes = (uint8_t*)pvBuffer;
-        size_t   bytesToLog = bufferSize;
+        pCurr = (uint8_t*)pvBuffer;
+        size_t   bytesToLog = bytesToRead;
         while (bytesToLog-- > 0)
         {
-            uint8_t byte = *pBytes++;
+            uint8_t byte = *pCurr++;
             if (isprint(byte))
                 fwrite(&byte, 1, 1, pThis->pLogFile);
             else
