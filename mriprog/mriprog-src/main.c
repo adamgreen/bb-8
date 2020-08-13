@@ -116,7 +116,9 @@ int main(int argc, const char** argv)
         printf("Checksumming flash vector table...\n");
         checksumVectors(pRegions);
 
-        /* Sending '+' will ACK any outstanding packet from MRI or force MRI to stop execution if still running. */
+        /* Sending CTRL+C will make sure that a running process will be stopped and T packet sent. */
+        IComm_SendChar(pComm, '\x03');
+        /* Sending '+' will ACK any outstanding packet from MRI. */
         IComm_SendChar(pComm, '+');
         gdbRemoteInit(pComm);
 
