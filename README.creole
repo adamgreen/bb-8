@@ -1,4 +1,7 @@
 =BB-8 Droid Replica Project
+=Archived - February 4th, 2024
+This project is no longer under active development.
+
 ==Overview
 This project is just a place for me to record any progress I make as I attempt to build a replica of the BB-8 droid from
 the new //Star Wars: The Force Awakens// movie.
